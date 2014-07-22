@@ -38,7 +38,7 @@ func (ev SerialEvaler) Eval(obj Objectiver, pop Population) error {
 const (
 	DefaultCognition = 0.5
 	DefaultSocial    = 0.5
-	DefaultInertia   = 0.6
+	DefaultInertia   = 0.8
 )
 
 type SimpleMover struct {

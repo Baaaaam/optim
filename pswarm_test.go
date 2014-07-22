@@ -41,7 +41,6 @@ func TestAckley(t *testing.T) {
 }
 
 func Ackley(v []float64) float64 {
-	//fmt.Println("testing v: ", v)
 	x := v[0]
 	y := v[1]
 	return -20*math.Exp(-0.2*math.Sqrt(0.5*(x*x+y*y))) -

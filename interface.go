@@ -13,7 +13,7 @@ func (p *Particle) Update(newval float64) {
 	p.Val = newval
 	if p.Val < p.BestVal || p.BestPos == nil {
 		p.BestVal = p.Val
-		p.BestPos = p.Pos
+		p.BestPos = append([]float64{}, p.Pos...)
 	}
 }
 
@@ -23,7 +23,7 @@ func (pop Population) Best() (val float64, pos []float64) {
 	val = pop[0].BestVal
 	pos = pop[0].BestPos
 	for _, p := range pop[1:] {
-		if p.BestVal < val || pos == nil {
+		if p.BestVal < val {
 			val = p.BestVal
 			pos = p.BestPos
 		}
