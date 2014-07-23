@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/rwcarlsen/gopswarm"
-	"github.com/rwcarlsen/gopswarm/population"
+	"github.com/rwcarlsen/optim/pswarm"
+	"github.com/rwcarlsen/optim/pswarm/population"
 )
 
 func TestAckley(t *testing.T) {

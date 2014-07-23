@@ -3,7 +3,7 @@ package population
 import (
 	"math/rand"
 
-	"github.com/rwcarlsen/gopswarm"
+	"github.com/rwcarlsen/optim/pswarm"
 )
 
 func NewRandom(n int, lb, ub, minv, maxv []float64) pswarm.Population {
