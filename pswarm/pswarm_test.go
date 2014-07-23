@@ -6,18 +6,19 @@ import (
 	"testing"
 	"time"
 
+	"github.com/rwcarlsen/optim"
 	"github.com/rwcarlsen/optim/pswarm"
 	"github.com/rwcarlsen/optim/pswarm/population"
 )
 
 func TestAckley(t *testing.T) {
 	it := pswarm.SimpleIter{}
-	ev := pswarm.SerialEvaler{}
+	ev := optim.SerialEvaler{}
 	mv := &pswarm.SimpleMover{
 		Cognition: pswarm.DefaultCognition,
 		Social:    pswarm.DefaultSocial,
 	}
-	obj := pswarm.NewObjectivePrinter(pswarm.SimpleObjectiver(Ackley))
+	obj := optim.NewObjectivePrinter(optim.SimpleObjectiver(Ackley))
 
 	lb := []float64{-5, -5}
 	ub := []float64{5, 5}
