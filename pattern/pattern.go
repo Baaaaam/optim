@@ -26,9 +26,9 @@ func (it *SimpleIter) Iterate(p Point, ob optim.Objectiver, ev optim.Evaler, pol
 
 type Poller interface {
 	Poll(obj optim.Objectiver, ev optim.Evaler, from Point) (success bool, bestval, bestpos []float64)
-	mesh.Mesh
 }
 
-type Grid interface {
-	PollPoints(curr Point) [][]float64
+type SimplePoller struct {
+	Mesh  mesh.Mesh
+	Basis [][]float64
 }
