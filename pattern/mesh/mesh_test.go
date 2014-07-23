@@ -3,28 +3,40 @@ package mesh
 import (
 	"math"
 	"testing"
+
+	"github.com/gonum/matrix/mat64"
 )
 
 type Problem struct {
 	Step       float64
 	Point, Exp []float64
+	Basis      *mat64.Dense
 }
 
 var tests = []Problem{
 	Problem{
 		Step:  1.3,
+		Basis: nil,
 		Point: []float64{0.1, 0.1},
 		Exp:   []float64{0.0, 0.0},
 	},
 	Problem{
 		Step:  1.3,
+		Basis: nil,
 		Point: []float64{1.0, 1.0},
 		Exp:   []float64{1.3, 1.3},
 	},
 	Problem{
 		Step:  1.3,
+		Basis: nil,
 		Point: []float64{1.9, 1.9},
 		Exp:   []float64{1.3, 1.3},
+	},
+	Problem{ // 45 deg clockwise rotation of the identity basis
+		Step:  1.0,
+		Basis: mat64.NewDense(2, 2, []float64{1 / math.Sqrt(2), 1 / math.Sqrt(2), -1 / math.Sqrt(2), 1 / math.Sqrt(2)}),
+		Point: []float64{1.0, 1.0},
+		Exp:   []float64{1 / math.Sqrt(2), 1 / math.Sqrt(2)},
 	},
 }
 
@@ -32,7 +44,7 @@ func TestSimple(t *testing.T) {
 	maxulps := uint64(1)
 
 	for i, prob := range tests {
-		sm := &SimpleMesh{Step: prob.Step}
+		sm := &SimpleMesh{Step: prob.Step, Basis: prob.Basis}
 		got := sm.Nearest(prob.Point)
 		t.Logf("prob %v:", i)
 		for j := range got {
