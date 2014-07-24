@@ -20,9 +20,9 @@ func TestSolverBench(t *testing.T) {
 
 		best, n, _ := bench.Benchmark(it, fn, .01, maxiter)
 		if n < maxiter {
-			t.Logf("[%v:pass] %v evals: optimum is %v, got %v", fn.Name(), n, optimum, best.Val)
+			t.Logf("[pass:%v] %v evals: optimum is %v, got %v", fn.Name(), n, optimum, best.Val)
 		} else {
-			t.Errorf("[%v:FAIL] optimum is %v, got %v", fn.Name(), optimum, best.Val)
+			t.Errorf("[FAIL:%v] optimum is %v, got %v", fn.Name(), optimum, best.Val)
 		}
 	}
 }

@@ -1,51 +1,52 @@
 package pswarm_test
 
 import (
-	"math"
 	"math/rand"
 	"testing"
 	"time"
 
 	"github.com/rwcarlsen/optim"
+	"github.com/rwcarlsen/optim/bench"
 	"github.com/rwcarlsen/optim/pswarm"
 	"github.com/rwcarlsen/optim/pswarm/population"
 )
 
-func TestAckley(t *testing.T) {
+func TestSolverBench(t *testing.T) {
+	maxiter := 30000
+	for _, fn := range bench.AllFuncs {
+		optimum := fn.Optima()[0].Val
+		it := buildIter(fn)
+
+		best, n, _ := bench.Benchmark(it, fn, .01, maxiter)
+		if n < maxiter {
+			t.Logf("[pass:%v] %v evals: optimum is %v, got %v", fn.Name(), n, optimum, best.Val)
+		} else {
+			t.Errorf("[FAIL:%v] optimum is %v, got %v", fn.Name(), optimum, best.Val)
+		}
+	}
+}
+
+func buildIter(fn bench.Func) optim.Iterator {
 	ev := optim.SerialEvaler{}
 	mv := &pswarm.SimpleMover{
 		Cognition: pswarm.DefaultCognition,
 		Social:    pswarm.DefaultSocial,
 	}
-	obj := optim.NewObjectivePrinter(optim.SimpleObjectiver(Ackley))
 
-	lb := []float64{-5, -5}
-	ub := []float64{5, 5}
-	minv := []float64{0.5, 0.5}
-	maxv := []float64{1.5, 1.5}
+	low, up := fn.Bounds()
+	minv := make([]float64, len(up))
+	maxv := make([]float64, len(up))
+	for i := range up {
+		minv[i] = (up[i] - low[i]) / 10
+		maxv[i] = minv[i] * 1.7
+	}
 
 	rand.Seed(time.Now().Unix())
-	pop := population.NewRandom(30, lb, ub, minv, maxv)
+	pop := population.NewRandom(30, low, up, minv, maxv)
 
-	it := pswarm.SimpleIter{
+	return pswarm.SimpleIter{
 		Pop:    pop,
 		Evaler: ev,
 		Mover:  mv,
 	}
-
-	for i := 0; i < 500; i++ {
-		it.Iterate(obj)
-	}
-
-	val, pos := pop.Best()
-	t.Log("BestVal: ", val)
-	t.Log("Found at: ", pos)
-}
-
-func Ackley(v []float64) float64 {
-	x := v[0]
-	y := v[1]
-	return -20*math.Exp(-0.2*math.Sqrt(0.5*(x*x+y*y))) -
-		math.Exp(0.5*(math.Cos(2*math.Pi*x)+math.Cos(2*math.Pi*y))) +
-		20 + math.E
 }
