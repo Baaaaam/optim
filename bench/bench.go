@@ -105,7 +105,7 @@ type Func interface {
 	Optima() []optim.Point
 }
 
-func Bench(it optim.Iterator, fn Func, tol float64, maxeval int) (best optim.Point, neval int, err error) {
+func Benchmark(it optim.Iterator, fn Func, tol float64, maxeval int) (best optim.Point, neval int, err error) {
 	obj := optim.SimpleObjectiver(fn.Eval)
 	optimum := fn.Optima()[0].Val
 	for neval < maxeval {
