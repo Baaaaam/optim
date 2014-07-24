@@ -12,7 +12,6 @@ import (
 )
 
 func TestAckley(t *testing.T) {
-	it := pswarm.SimpleIter{}
 	ev := optim.SerialEvaler{}
 	mv := &pswarm.SimpleMover{
 		Cognition: pswarm.DefaultCognition,
@@ -28,8 +27,14 @@ func TestAckley(t *testing.T) {
 	rand.Seed(time.Now().Unix())
 	pop := population.NewRandom(30, lb, ub, minv, maxv)
 
+	it := pswarm.SimpleIter{
+		Pop:    pop,
+		Evaler: ev,
+		Mover:  mv,
+	}
+
 	for i := 0; i < 500; i++ {
-		pop, _ = it.Iterate(pop, obj, ev, mv)
+		it.Iterate(obj)
 	}
 
 	val, pos := pop.Best()

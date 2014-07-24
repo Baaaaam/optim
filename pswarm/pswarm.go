@@ -59,19 +59,24 @@ type Mover interface {
 	Move(p Population)
 }
 
-type SimpleIter struct{}
+type SimpleIter struct {
+	Pop Population
+	optim.Evaler
+	Mover
+}
 
-func (it SimpleIter) Iterate(p Population, obj optim.Objectiver, ev optim.Evaler, mv Mover) (Population, error) {
-	vals, err := ev.Eval(obj, p.Points()...)
+func (it SimpleIter) Iterate(obj optim.Objectiver) (best optim.Point, neval int, err error) {
+	vals, n, err := it.Evaler.Eval(obj, it.Pop.Points()...)
 	if err != nil {
-		return nil, err
+		return optim.Point{}, n, err
 	}
 	for i := range vals {
-		p[i].Update(vals[i])
+		it.Pop[i].Update(vals[i])
 	}
 
-	mv.Move(p)
-	return p, nil
+	it.Mover.Move(it.Pop)
+	val, pos := it.Pop.Best()
+	return optim.Point{Pos: pos, Val: val}, n, nil
 }
 
 const (

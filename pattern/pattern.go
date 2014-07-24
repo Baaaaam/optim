@@ -9,42 +9,47 @@ import (
 var FoundBetterErr = errors.New("better position discovered")
 
 type Iterator struct {
-	obj *ObjStopper
-	ev  optim.Evaler
-	p   Poller
-	s   Searcher
+	ev   optim.Evaler
+	p    Poller
+	s    Searcher
+	curr optim.Point
 }
 
-func NewIterator(o optim.Objectiver, e optim.Evaler, p Poller, s Searcher) *Iterator {
+func NewIterator(start optim.Point, e optim.Evaler, p Poller, s Searcher) *Iterator {
 	return &Iterator{
-		obj: &ObjStopper{Objectiver: o},
-		ev:  e,
-		p:   p,
-		s:   s,
+		curr: start,
+		ev:   e,
+		p:    p,
+		s:    s,
 	}
 }
 
-func (it *Iterator) Iterate(p optim.Point) (optim.Point, error) {
-	success, best, err := it.s.Search(p)
+func (it *Iterator) Iterate(o optim.Objectiver) (best optim.Point, n int, err error) {
+	obj := &ObjStopper{Objectiver: o}
+	success, best, ns, err := it.s.Search(it.curr)
+	n += ns
 	if err != nil {
-		return optim.Point{}, err
+		return optim.Point{}, n, err
 	} else if success {
-		return best, nil
+		it.curr = best
+		return best, n, nil
 	}
 
-	it.obj.Best = p.Val
-	success, best, err = it.p.Poll(it.obj, it.ev, p)
+	obj.Best = it.curr.Val
+	success, best, np, err := it.p.Poll(obj, it.ev, it.curr)
+	n += np
 	if err != nil {
-		return optim.Point{}, err
+		return optim.Point{}, n, err
 	} else if success {
-		return best, nil
+		it.curr = best
+		return best, n, nil
 	} else {
-		return p, nil
+		return it.curr, n, nil
 	}
 }
 
 type Poller interface {
-	Poll(obj optim.Objectiver, ev optim.Evaler, from optim.Point) (success bool, best optim.Point, err error)
+	Poll(obj optim.Objectiver, ev optim.Evaler, from optim.Point) (success bool, best optim.Point, neval int, err error)
 }
 
 type CompassPoller struct {
@@ -54,7 +59,7 @@ type CompassPoller struct {
 	Contract float64
 }
 
-func (cp *CompassPoller) Poll(obj optim.Objectiver, ev optim.Evaler, from optim.Point) (success bool, best optim.Point, err error) {
+func (cp *CompassPoller) Poll(obj optim.Objectiver, ev optim.Evaler, from optim.Point) (success bool, best optim.Point, neval int, err error) {
 	points := make([][]float64, len(cp.Direcs))
 	for i, dir := range cp.Direcs {
 		points[i] = make([]float64, len(from.Pos))
@@ -63,30 +68,30 @@ func (cp *CompassPoller) Poll(obj optim.Objectiver, ev optim.Evaler, from optim.
 		}
 	}
 
-	results, err := ev.Eval(obj, points...)
+	results, n, err := ev.Eval(obj, points...)
 	if err == nil || err == FoundBetterErr {
 		for i := range results {
 			if results[i] < from.Val {
 				cp.Step *= cp.Expand
-				return true, optim.Point{Pos: points[i], Val: results[i]}, nil
+				return true, optim.Point{Pos: points[i], Val: results[i]}, n, nil
 			}
 		}
 	} else if err != nil {
-		return false, optim.Point{}, err
+		return false, optim.Point{}, n, err
 	}
 
 	cp.Step *= cp.Contract
-	return false, from, nil
+	return false, from, n, nil
 }
 
 type Searcher interface {
-	Search(curr optim.Point) (success bool, best optim.Point, err error)
+	Search(curr optim.Point) (success bool, best optim.Point, n int, err error)
 }
 
 type NullSearcher struct{}
 
-func (_ NullSearcher) Search(curr optim.Point) (success bool, best optim.Point, err error) {
-	return false, optim.Point{}, nil
+func (_ NullSearcher) Search(curr optim.Point) (success bool, best optim.Point, n int, err error) {
+	return false, optim.Point{}, 0, nil
 }
 
 type ObjStopper struct {

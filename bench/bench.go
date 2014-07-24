@@ -105,24 +105,18 @@ type Func interface {
 	Optima() []optim.Point
 }
 
-func Bench(it Iterator, fn Func, tol float64, maxeval int) (best optim.Point, neval int, err error) {
+func Bench(it optim.Iterator, fn Func, tol float64, maxeval int) (best optim.Point, neval int, err error) {
 	obj := optim.SimpleObjectiver(fn.Eval)
 	optimum := fn.Optima()[0].Val
 	for neval < maxeval {
 		var n int
-		n, best, err = it.BenchIter(obj)
-		tot += n
+		best, n, err = it.Iterate(obj)
+		neval += n
 		if err != nil {
-			return optim.Point{}, tot, err
+			return optim.Point{}, neval, err
 		} else if abs(best.Val-optimum)/optimum < tol {
-			return best, tot, nil
+			return best, neval, nil
 		}
 	}
-	return best, tot, nil
-}
-
-type Iterator interface {
-	// BenchIter runs a single iteration of a solver and reports the number of
-	// function evaluations n and the best point.
-	BenchIter(obj optim.Objectiver) (n int, best optim.Point, err error)
+	return best, neval, nil
 }

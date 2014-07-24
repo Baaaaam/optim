@@ -10,11 +10,18 @@ type Point struct {
 	Val float64
 }
 
+type Iterator interface {
+	// Iterate runs a single iteration of a solver and reports the number of
+	// function evaluations n and the best point.
+	Iterate(obj Objectiver) (best Point, n int, err error)
+}
+
 type Evaler interface {
-	// Eval evaluates each point using obj.  Length of the returned vals slice
-	// must always be equal to the number of points.  Unevaluated points
-	// should have their vals slice entries set to positive infinity.
-	Eval(obj Objectiver, points ...[]float64) (vals []float64, err error)
+	// Eval evaluates each point using obj and returns the values and number
+	// of function evaluations n.  Length of the returned vals slice must
+	// always be equal to the number of points.  Unevaluated points should
+	// have their vals slice entries set to positive infinity.
+	Eval(obj Objectiver, points ...[]float64) (vals []float64, n int, err error)
 }
 
 type Objectiver interface {
@@ -30,7 +37,7 @@ type SerialEvaler struct {
 	ContinueOnErr bool
 }
 
-func (ev SerialEvaler) Eval(obj Objectiver, points ...[]float64) (vals []float64, err error) {
+func (ev SerialEvaler) Eval(obj Objectiver, points ...[]float64) (vals []float64, n int, err error) {
 	vals = make([]float64, len(points))
 	for i := range vals {
 		vals[i] = math.Inf(1)
@@ -38,10 +45,10 @@ func (ev SerialEvaler) Eval(obj Objectiver, points ...[]float64) (vals []float64
 	for i, p := range points {
 		vals[i], err = obj.Objective(p)
 		if err != nil && !ev.ContinueOnErr {
-			return vals, err
+			return vals, i, err
 		}
 	}
-	return vals, nil
+	return vals, len(points), nil
 }
 
 type SimpleObjectiver func([]float64) float64

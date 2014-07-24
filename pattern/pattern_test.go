@@ -26,15 +26,15 @@ func TestAckley(t *testing.T) {
 		},
 	}
 
-	it := pattern.NewIterator(obj, ev, p, s)
-
 	rand.Seed(time.Now().Unix())
 	x := (rand.Float64()*2 - 1.0) * 10
 	y := (rand.Float64()*2 - 1.0) * 10
 	point := optim.Point{Pos: []float64{x, y}, Val: math.Inf(1)}
 
+	it := pattern.NewIterator(point, ev, p, s)
+
 	for i := 0; i < 100; i++ {
-		point, _ = it.Iterate(point)
+		point, _, _ = it.Iterate(obj)
 	}
 
 	t.Log("BestVal: ", point.Val)
