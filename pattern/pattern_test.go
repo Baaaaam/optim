@@ -11,12 +11,27 @@ import (
 	"github.com/rwcarlsen/optim/pattern"
 )
 
-func TestAckley(t *testing.T) {
-	// initialize iterator
+func TestSolverBench(t *testing.T) {
+	maxiter := 10000
+	for _, fn := range bench.AllFuncs {
+		optimum := fn.Optima()[0].Val
+		low, up := fn.Bounds()
+		it := buildIter((up[0]-low[0])/5, low[0], up[0])
+
+		best, n, _ := bench.Benchmark(it, fn, .01, maxiter)
+		if n < maxiter {
+			t.Logf("[%v:pass] %v evals: optimum is %v, got %v", fn.Name(), n, optimum, best.Val)
+		} else {
+			t.Errorf("[%v:FAIL] optimum is %v, got %v", fn.Name(), optimum, best.Val)
+		}
+	}
+}
+
+func buildIter(step, max, min float64) optim.Iterator {
 	ev := optim.SerialEvaler{}
 	s := pattern.NullSearcher{}
 	p := &pattern.CompassPoller{
-		Step:     1.0,
+		Step:     step,
 		Expand:   2.0,
 		Contract: 0.5,
 		Direcs: [][]float64{
@@ -28,19 +43,8 @@ func TestAckley(t *testing.T) {
 	}
 
 	rand.Seed(time.Now().Unix())
-	x := (rand.Float64()*2 - 1.0) * 10
-	y := (rand.Float64()*2 - 1.0) * 10
+	x := rand.Float64()*(max-min) + min
+	y := rand.Float64()*(max-min) + min
 	point := optim.Point{Pos: []float64{x, y}, Val: math.Inf(1)}
-
-	it := pattern.NewIterator(point, ev, p, s)
-
-	// run benchmark
-	fn := bench.Ackley{}
-	optimum := fn.Optima()[0].Val
-	best, n, _ := bench.Benchmark(it, bench.Ackley{}, .01, 10000)
-	if math.Abs(best.Val-optimum)/optimum >= 0.1 {
-		t.Errorf("Failed to converge: optimum is %v, got %v", optimum, best.Val)
-	} else {
-		t.Errorf("Success (%v evals): optimum is %v, got %v", n, optimum, best.Val)
-	}
+	return pattern.NewIterator(point, ev, p, s)
 }

@@ -17,11 +17,29 @@ var (
 	sqrt = math.Sqrt
 )
 
-// Ackley has minimum: f(0, 0) = 0 within bounds: -5 <=
-// x,y <= 5
+var AllFuncs = []Func{
+	Ackley{},
+	CrossTray{},
+	Eggholder{},
+	HolderTable{},
+}
+
+type Func interface {
+	Eval(v []float64) float64
+	Bounds() (low, up []float64)
+	Optima() []optim.Point
+	Name() string
+}
+
 type Ackley struct{}
 
+func (fn Ackley) Name() string { return "Ackley" }
+
 func (fn Ackley) Eval(v []float64) float64 {
+	if !InsideBounds(v, fn) {
+		return math.Inf(1)
+	}
+
 	x := v[0]
 	y := v[1]
 	return -20*math.Exp(-0.2*math.Sqrt(0.5*(x*x+y*y))) -
@@ -41,7 +59,13 @@ func (fn Ackley) Optima() []optim.Point {
 
 type CrossTray struct{}
 
+func (fn CrossTray) Name() string { return "CrossTray" }
+
 func (fn CrossTray) Eval(v []float64) float64 {
+	if !InsideBounds(v, fn) {
+		return math.Inf(1)
+	}
+
 	x := v[0]
 	y := v[1]
 	return -.0001 * math.Pow(abs(sin(x)*sin(y)*exp(abs(100-sqrt(x*x+y*y)/math.Pi)))+1, 0.1)
@@ -62,7 +86,13 @@ func (fn CrossTray) Optima() []optim.Point {
 
 type Eggholder struct{}
 
+func (fn Eggholder) Name() string { return "Eggholder" }
+
 func (fn Eggholder) Eval(v []float64) float64 {
+	if !InsideBounds(v, fn) {
+		return math.Inf(1)
+	}
+
 	x := v[0]
 	y := v[1]
 	return -(y+47)*sin(sqrt(abs(y+x/2+47))) - x*sin(sqrt(abs(x-(y+47))))
@@ -80,7 +110,13 @@ func (fn Eggholder) Optima() []optim.Point {
 
 type HolderTable struct{}
 
+func (fn HolderTable) Name() string { return "HolderTable" }
+
 func (fn HolderTable) Eval(v []float64) float64 {
+	if !InsideBounds(v, fn) {
+		return math.Inf(1)
+	}
+
 	x := v[0]
 	y := v[1]
 	return -abs(sin(x) * cos(y) * exp(abs(1-sqrt(x*x+y*y)/math.Pi)))
@@ -99,12 +135,6 @@ func (fn HolderTable) Optima() []optim.Point {
 	}
 }
 
-type Func interface {
-	Eval(v []float64) float64
-	Bounds() (low, up []float64)
-	Optima() []optim.Point
-}
-
 func Benchmark(it optim.Iterator, fn Func, tol float64, maxeval int) (best optim.Point, neval int, err error) {
 	obj := optim.SimpleObjectiver(fn.Eval)
 	optimum := fn.Optima()[0].Val
@@ -114,9 +144,21 @@ func Benchmark(it optim.Iterator, fn Func, tol float64, maxeval int) (best optim
 		neval += n
 		if err != nil {
 			return optim.Point{}, neval, err
-		} else if abs(best.Val-optimum)/optimum < tol {
+		} else if optimum == 0 && abs(optimum-best.Val) < 1e-10 {
+			return best, neval, nil
+		} else if optimum != 0 && abs(best.Val-optimum)/abs(optimum) < tol {
 			return best, neval, nil
 		}
 	}
 	return best, neval, nil
+}
+
+func InsideBounds(p []float64, fn Func) bool {
+	low, up := fn.Bounds()
+	for i := range p {
+		if p[i] < low[i] || p[i] > up[i] {
+			return false
+		}
+	}
+	return true
 }

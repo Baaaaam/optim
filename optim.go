@@ -45,7 +45,7 @@ func (ev SerialEvaler) Eval(obj Objectiver, points ...[]float64) (vals []float64
 	for i, p := range points {
 		vals[i], err = obj.Objective(p)
 		if err != nil && !ev.ContinueOnErr {
-			return vals, i, err
+			return vals, i + 1, err
 		}
 	}
 	return vals, len(points), nil

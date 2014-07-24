@@ -2,6 +2,7 @@ package pattern
 
 import (
 	"errors"
+	"fmt"
 
 	"github.com/rwcarlsen/optim"
 )
@@ -69,6 +70,7 @@ func (cp *CompassPoller) Poll(obj optim.Objectiver, ev optim.Evaler, from optim.
 	}
 
 	results, n, err := ev.Eval(obj, points...)
+	fmt.Println("neval: ", n)
 	if err == nil || err == FoundBetterErr {
 		for i := range results {
 			if results[i] < from.Val {
