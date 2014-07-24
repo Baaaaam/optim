@@ -62,7 +62,7 @@ type Mover interface {
 type SimpleIter struct{}
 
 func (it SimpleIter) Iterate(p Population, obj optim.Objectiver, ev optim.Evaler, mv Mover) (Population, error) {
-	vals, err := ev.Eval(obj, p.Points())
+	vals, err := ev.Eval(obj, p.Points()...)
 	if err != nil {
 		return nil, err
 	}

@@ -1,28 +1,43 @@
 package optim
 
-import "fmt"
+import (
+	"fmt"
+	"math"
+)
 
 // evaler will need to project particles onto mesh. and will decide whether to
 // parallellize or not.
 // Must update particles' objective, and best objective, and best pos.
+
 type Evaler interface {
-	Eval(obj Objectiver, points [][]float64) (vals []float64, err error)
+	// Eval evaluates each point using obj.  Length of the returned vals slice
+	// must always be equal to the number of points.  Unevaluated points
+	// should have their vals slice entries set to positive infinity.
+	Eval(obj Objectiver, points ...[]float64) (vals []float64, err error)
 }
 
 type Objectiver interface {
+	// Objective evaluates the variables in v and returns the objective
+	// function value.  The objective function must be framed so that lower
+	// values are better. If the evaluation fails, positive infinity should be
+	// returned along with an error.  Note that it is possible for an error to
+	// be returned if the evaulation succeeds.
 	Objective(v []float64) (float64, error)
 }
 
 type SerialEvaler struct {
-	StopOnErr bool
+	ContinueOnErr bool
 }
 
-func (ev SerialEvaler) Eval(obj Objectiver, points [][]float64) (vals []float64, err error) {
+func (ev SerialEvaler) Eval(obj Objectiver, points ...[]float64) (vals []float64, err error) {
 	vals = make([]float64, len(points))
+	for i := range vals {
+		vals[i] = math.Inf(1)
+	}
 	for i, p := range points {
 		vals[i], err = obj.Objective(p)
-		if err != nil && ev.StopOnErr {
-			return nil, err
+		if err != nil && !ev.ContinueOnErr {
+			return vals, err
 		}
 	}
 	return vals, nil

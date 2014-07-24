@@ -28,12 +28,8 @@ func TestAckley(t *testing.T) {
 	rand.Seed(time.Now().Unix())
 	pop := population.NewRandom(30, lb, ub, minv, maxv)
 
-	var err error
 	for i := 0; i < 500; i++ {
-		pop, err = it.Iterate(pop, obj, ev, mv)
-		if err != nil {
-			t.Fatal(err)
-		}
+		pop, _ = it.Iterate(pop, obj, ev, mv)
 	}
 
 	val, pos := pop.Best()
