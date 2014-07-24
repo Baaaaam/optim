@@ -5,9 +5,10 @@ import (
 	"math"
 )
 
-// evaler will need to project particles onto mesh. and will decide whether to
-// parallellize or not.
-// Must update particles' objective, and best objective, and best pos.
+type Point struct {
+	Pos []float64
+	Val float64
+}
 
 type Evaler interface {
 	// Eval evaluates each point using obj.  Length of the returned vals slice

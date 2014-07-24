@@ -31,7 +31,7 @@ func TestAckley(t *testing.T) {
 	rand.Seed(time.Now().Unix())
 	x := (rand.Float64()*2 - 1.0) * 10
 	y := (rand.Float64()*2 - 1.0) * 10
-	point := pattern.Point{Pos: []float64{x, y}, Val: math.Inf(1)}
+	point := optim.Point{Pos: []float64{x, y}, Val: math.Inf(1)}
 
 	for i := 0; i < 100; i++ {
 		point, _ = it.Iterate(point)
@@ -47,4 +47,24 @@ func Ackley(v []float64) float64 {
 	return -20*math.Exp(-0.2*math.Sqrt(0.5*(x*x+y*y))) -
 		math.Exp(0.5*(math.Cos(2*math.Pi*x)+math.Cos(2*math.Pi*y))) +
 		20 + math.E
+}
+
+var (
+	sin  = math.Sin
+	cos  = math.Cos
+	abs  = math.Abs
+	exp  = math.Exp
+	sqrt = math.Sqrt
+)
+
+func CrossTray(v []float64) float64 {
+	x := v[0]
+	y := v[1]
+	return -.0001 * math.Pow(abs(sin(x)*sin(y)*exp(abs(100-sqrt(x*x+y*y)/math.Pi)))+1, 0.1)
+}
+
+func Eggholder(v []float64) float64 {
+	x := v[0]
+	y := v[1]
+	return -(y+47)*sin(sqrt(abs(y+x/2+47))) - x*sin(sqrt(abs(x-(y+47))))
 }
