@@ -53,7 +53,6 @@ func buildIter(fn bench.Func) optim.Iterator {
 		Step:     (max - min) / 5,
 		Expand:   2.0,
 		Contract: 0.5,
-		NDims:    len(fn.Optima()[0].Pos),
 	}
 
 	rand.Seed(time.Now().Unix())
@@ -98,7 +97,6 @@ func buildHybrid(fn bench.Func) optim.Iterator {
 		Step:     (max - min) / 5,
 		Expand:   2.0,
 		Contract: 0.5,
-		NDims:    len(fn.Optima()[0].Pos),
 	}
 
 	rand.Seed(time.Now().Unix())

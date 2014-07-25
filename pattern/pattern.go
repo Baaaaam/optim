@@ -54,7 +54,6 @@ type Poller interface {
 
 type CompassPoller struct {
 	Step     float64
-	NDims    int
 	Expand   float64
 	Contract float64
 	direcs   [][]float64
@@ -73,7 +72,7 @@ func generateDirecs(ndim int) [][]float64 {
 
 func (cp *CompassPoller) Poll(obj optim.Objectiver, ev optim.Evaler, from optim.Point) (success bool, best optim.Point, neval int, err error) {
 	if cp.direcs == nil {
-		cp.direcs = generateDirecs(cp.NDims)
+		cp.direcs = generateDirecs(len(from.Pos))
 	}
 	points := make([][]float64, len(cp.direcs))
 	for i, dir := range cp.direcs {
