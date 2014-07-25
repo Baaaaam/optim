@@ -4,6 +4,7 @@ import (
 	"math/rand"
 
 	"github.com/rwcarlsen/optim"
+	"github.com/rwcarlsen/optim/mesh"
 )
 
 type Particle struct {
@@ -45,12 +46,6 @@ func (pop Population) Best() (val float64, pos []float64) {
 	return val, pos
 }
 
-// Run a single iteration of the algorithm. combine/adjust particle numbers if
-// necessary.
-type Iterator interface {
-	Iterate(pop Population, ob optim.Objectiver, ev optim.Evaler, mv Mover) (Population, error)
-}
-
 // mover tracks constraints:
 //    ConstrA   *mat64.Dense
 //    Constrb   *mat64.Dense
@@ -65,8 +60,14 @@ type SimpleIter struct {
 	Mover
 }
 
-func (it SimpleIter) Iterate(obj optim.Objectiver) (best optim.Point, neval int, err error) {
-	vals, n, err := it.Evaler.Eval(obj, it.Pop.Points()...)
+func (it SimpleIter) Iterate(obj optim.Objectiver, m mesh.Mesh) (best optim.Point, neval int, err error) {
+	points := it.Pop.Points()
+	if m != nil {
+		for i := range points {
+			points[i] = m.Nearest(points[i])
+		}
+	}
+	vals, n, err := it.Evaler.Eval(obj, points...)
 	if err != nil {
 		return optim.Point{}, n, err
 	}

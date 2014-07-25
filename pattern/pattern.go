@@ -4,6 +4,7 @@ import (
 	"errors"
 
 	"github.com/rwcarlsen/optim"
+	"github.com/rwcarlsen/optim/mesh"
 )
 
 var FoundBetterErr = errors.New("better position discovered")
@@ -24,9 +25,9 @@ func NewIterator(start optim.Point, e optim.Evaler, p Poller, s Searcher) *Itera
 	}
 }
 
-func (it *Iterator) Iterate(o optim.Objectiver) (best optim.Point, n int, err error) {
+func (it *Iterator) Iterate(o optim.Objectiver, m mesh.Mesh) (best optim.Point, n int, err error) {
 	obj := &ObjStopper{Objectiver: o}
-	success, best, ns, err := it.s.Search(o, it.curr)
+	success, best, ns, err := it.s.Search(o, it.p.Mesh(), it.curr)
 	n += ns
 	if err != nil {
 		return optim.Point{}, n, err
@@ -40,6 +41,8 @@ func (it *Iterator) Iterate(o optim.Objectiver) (best optim.Point, n int, err er
 	n += np
 	if err != nil {
 		return optim.Point{}, n, err
+	} else if it.p.StepSize() == 0 {
+		return best, n, errors.New("poller step size is zero")
 	} else if success {
 		it.curr = best
 		return best, n, nil
@@ -50,6 +53,8 @@ func (it *Iterator) Iterate(o optim.Objectiver) (best optim.Point, n int, err er
 
 type Poller interface {
 	Poll(obj optim.Objectiver, ev optim.Evaler, from optim.Point) (success bool, best optim.Point, neval int, err error)
+	StepSize() float64
+	Mesh() mesh.Mesh
 }
 
 type CompassPoller struct {
@@ -57,6 +62,7 @@ type CompassPoller struct {
 	Expand   float64
 	Contract float64
 	direcs   [][]float64
+	curr     optim.Point
 }
 
 func generateDirecs(ndim int) [][]float64 {
@@ -70,10 +76,21 @@ func generateDirecs(ndim int) [][]float64 {
 	return dirs
 }
 
+func (cp *CompassPoller) StepSize() float64 { return cp.Step }
+
+func (cp *CompassPoller) Mesh() mesh.Mesh {
+	return &mesh.Infinite{
+		Origin: cp.curr.Pos,
+		Step:   cp.Step,
+	}
+}
+
 func (cp *CompassPoller) Poll(obj optim.Objectiver, ev optim.Evaler, from optim.Point) (success bool, best optim.Point, neval int, err error) {
 	if cp.direcs == nil {
 		cp.direcs = generateDirecs(len(from.Pos))
 	}
+	cp.curr = from
+
 	points := make([][]float64, len(cp.direcs))
 	for i, dir := range cp.direcs {
 		points[i] = make([]float64, len(from.Pos))
@@ -87,7 +104,8 @@ func (cp *CompassPoller) Poll(obj optim.Objectiver, ev optim.Evaler, from optim.
 		for i := range results {
 			if results[i] < from.Val {
 				cp.Step *= cp.Expand
-				return true, optim.Point{Pos: points[i], Val: results[i]}, n, nil
+				cp.curr = optim.Point{Pos: points[i], Val: results[i]}
+				return true, cp.curr, n, nil
 			}
 		}
 	} else if err != nil {
@@ -99,12 +117,12 @@ func (cp *CompassPoller) Poll(obj optim.Objectiver, ev optim.Evaler, from optim.
 }
 
 type Searcher interface {
-	Search(o optim.Objectiver, curr optim.Point) (success bool, best optim.Point, n int, err error)
+	Search(o optim.Objectiver, m mesh.Mesh, curr optim.Point) (success bool, best optim.Point, n int, err error)
 }
 
 type NullSearcher struct{}
 
-func (_ NullSearcher) Search(o optim.Objectiver, curr optim.Point) (success bool, best optim.Point, n int, err error) {
+func (_ NullSearcher) Search(o optim.Objectiver, m mesh.Mesh, curr optim.Point) (success bool, best optim.Point, n int, err error) {
 	return false, optim.Point{}, 0, nil
 }
 
@@ -112,8 +130,8 @@ type WrapSearcher struct {
 	Iter optim.Iterator
 }
 
-func (s *WrapSearcher) Search(o optim.Objectiver, curr optim.Point) (success bool, best optim.Point, n int, err error) {
-	best, n, err = s.Iter.Iterate(o)
+func (s *WrapSearcher) Search(o optim.Objectiver, m mesh.Mesh, curr optim.Point) (success bool, best optim.Point, n int, err error) {
+	best, n, err = s.Iter.Iterate(o, m)
 	if err != nil {
 		return false, optim.Point{}, n, err
 	}

@@ -3,6 +3,8 @@ package optim
 import (
 	"fmt"
 	"math"
+
+	"github.com/rwcarlsen/optim/mesh"
 )
 
 type Point struct {
@@ -13,7 +15,7 @@ type Point struct {
 type Iterator interface {
 	// Iterate runs a single iteration of a solver and reports the number of
 	// function evaluations n and the best point.
-	Iterate(obj Objectiver) (best Point, n int, err error)
+	Iterate(obj Objectiver, m mesh.Mesh) (best Point, n int, err error)
 }
 
 type Evaler interface {
