@@ -11,7 +11,7 @@ import (
 	"github.com/rwcarlsen/optim/pswarm/population"
 )
 
-func TestSolverBench(t *testing.T) {
+func TestSimple(t *testing.T) {
 	maxiter := 50000
 	for _, fn := range bench.AllFuncs {
 		optimum := fn.Optima()[0].Val
@@ -42,7 +42,7 @@ func buildIter(fn bench.Func) optim.Iterator {
 	}
 
 	rand.Seed(time.Now().Unix())
-	pop := population.NewRandom(50, low, up, minv, maxv)
+	pop := population.NewRandom(15*len(low), low, up, minv, maxv)
 
 	return pswarm.SimpleIter{
 		Pop:    pop,

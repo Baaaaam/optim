@@ -26,7 +26,7 @@ func NewIterator(start optim.Point, e optim.Evaler, p Poller, s Searcher) *Itera
 
 func (it *Iterator) Iterate(o optim.Objectiver) (best optim.Point, n int, err error) {
 	obj := &ObjStopper{Objectiver: o}
-	success, best, ns, err := it.s.Search(it.curr)
+	success, best, ns, err := it.s.Search(o, it.curr)
 	n += ns
 	if err != nil {
 		return optim.Point{}, n, err
@@ -100,13 +100,28 @@ func (cp *CompassPoller) Poll(obj optim.Objectiver, ev optim.Evaler, from optim.
 }
 
 type Searcher interface {
-	Search(curr optim.Point) (success bool, best optim.Point, n int, err error)
+	Search(o optim.Objectiver, curr optim.Point) (success bool, best optim.Point, n int, err error)
 }
 
 type NullSearcher struct{}
 
-func (_ NullSearcher) Search(curr optim.Point) (success bool, best optim.Point, n int, err error) {
+func (_ NullSearcher) Search(o optim.Objectiver, curr optim.Point) (success bool, best optim.Point, n int, err error) {
 	return false, optim.Point{}, 0, nil
+}
+
+type WrapSearcher struct {
+	Iter optim.Iterator
+}
+
+func (s *WrapSearcher) Search(o optim.Objectiver, curr optim.Point) (success bool, best optim.Point, n int, err error) {
+	best, n, err = s.Iter.Iterate(o)
+	if err != nil {
+		return false, optim.Point{}, n, err
+	}
+	if best.Val < curr.Val {
+		return true, best, n, nil
+	}
+	return false, curr, n, nil
 }
 
 type ObjStopper struct {
