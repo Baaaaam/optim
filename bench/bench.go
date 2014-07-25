@@ -22,6 +22,7 @@ var AllFuncs = []Func{
 	CrossTray{},
 	Eggholder{},
 	HolderTable{},
+	Schaffer2{},
 }
 
 type Func interface {
@@ -132,6 +133,30 @@ func (fn HolderTable) Optima() []optim.Point {
 		optim.Point{Pos: []float64{-8.05502, 9.66459}, Val: -19.2085},
 		optim.Point{Pos: []float64{8.05502, -9.66459}, Val: -19.2085},
 		optim.Point{Pos: []float64{-8.05502, -9.66459}, Val: -19.2085},
+	}
+}
+
+type Schaffer2 struct{}
+
+func (fn Schaffer2) Name() string { return "Schaffer2" }
+
+func (fn Schaffer2) Eval(v []float64) float64 {
+	if !InsideBounds(v, fn) {
+		return math.Inf(1)
+	}
+
+	x := v[0]
+	y := v[1]
+	return 0.5 + (math.Pow(sin(x*x-y*y), 2)-0.5)/math.Pow(1+.0001*(x*x+y*y), 2)
+}
+
+func (fn Schaffer2) Bounds() (low, up []float64) {
+	return []float64{-100, -100}, []float64{100, 100}
+}
+
+func (fn Schaffer2) Optima() []optim.Point {
+	return []optim.Point{
+		optim.Point{Pos: []float64{0, 0}, Val: 0},
 	}
 }
 
