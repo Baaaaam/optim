@@ -12,7 +12,7 @@ import (
 )
 
 func TestSolverBench(t *testing.T) {
-	maxiter := 10000
+	maxiter := 50000
 	for _, fn := range bench.AllFuncs {
 		optimum := fn.Optima()[0].Val
 		it := buildIter(fn)

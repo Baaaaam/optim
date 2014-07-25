@@ -82,7 +82,7 @@ func (it SimpleIter) Iterate(obj optim.Objectiver) (best optim.Point, neval int,
 const (
 	DefaultCognition = 0.5
 	DefaultSocial    = 0.5
-	DefaultInertia   = 0.8
+	DefaultInertia   = 0.9
 )
 
 type SimpleMover struct {

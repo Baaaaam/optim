@@ -12,7 +12,7 @@ import (
 )
 
 func TestSolverBench(t *testing.T) {
-	maxiter := 30000
+	maxiter := 50000
 	for _, fn := range bench.AllFuncs {
 		optimum := fn.Optima()[0].Val
 		it := buildIter(fn)
@@ -37,12 +37,12 @@ func buildIter(fn bench.Func) optim.Iterator {
 	minv := make([]float64, len(up))
 	maxv := make([]float64, len(up))
 	for i := range up {
-		minv[i] = (up[i] - low[i]) / 10
+		minv[i] = (up[i] - low[i]) / 6
 		maxv[i] = minv[i] * 1.7
 	}
 
 	rand.Seed(time.Now().Unix())
-	pop := population.NewRandom(30, low, up, minv, maxv)
+	pop := population.NewRandom(50, low, up, minv, maxv)
 
 	return pswarm.SimpleIter{
 		Pop:    pop,
