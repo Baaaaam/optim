@@ -15,8 +15,7 @@ func TestSolverBench(t *testing.T) {
 	maxiter := 10000
 	for _, fn := range bench.AllFuncs {
 		optimum := fn.Optima()[0].Val
-		low, up := fn.Bounds()
-		it := buildIter((up[0]-low[0])/5, low[0], up[0])
+		it := buildIter(fn)
 
 		best, n, _ := bench.Benchmark(it, fn, .01, maxiter)
 		if n < maxiter {
@@ -27,24 +26,23 @@ func TestSolverBench(t *testing.T) {
 	}
 }
 
-func buildIter(step, max, min float64) optim.Iterator {
+func buildIter(fn bench.Func) optim.Iterator {
+	low, up := fn.Bounds()
+	max, min := up[0], low[0]
+
 	ev := optim.SerialEvaler{}
 	s := pattern.NullSearcher{}
 	p := &pattern.CompassPoller{
-		Step:     step,
+		Step:     (max - min) / 5,
 		Expand:   2.0,
 		Contract: 0.5,
-		Direcs: [][]float64{
-			[]float64{1, 0},
-			[]float64{-1, 0},
-			[]float64{0, 1},
-			[]float64{0, -1},
-		},
+		NDims:    len(fn.Optima()[0].Pos),
 	}
 
 	rand.Seed(time.Now().Unix())
-	x := rand.Float64()*(max-min) + min
-	y := rand.Float64()*(max-min) + min
-	point := optim.Point{Pos: []float64{x, y}, Val: math.Inf(1)}
+	point := optim.Point{Val: math.Inf(1)}
+	for _ = range low {
+		point.Pos = append(point.Pos, rand.Float64()*(max-min)+min)
+	}
 	return pattern.NewIterator(point, ev, p, s)
 }

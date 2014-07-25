@@ -4,6 +4,7 @@
 package bench
 
 import (
+	"fmt"
 	"math"
 
 	"github.com/rwcarlsen/optim"
@@ -23,6 +24,10 @@ var AllFuncs = []Func{
 	Eggholder{},
 	HolderTable{},
 	Schaffer2{},
+	Styblinski{NDim: 1},
+	Styblinski{NDim: 2},
+	Styblinski{NDim: 3},
+	Styblinski{NDim: 4},
 }
 
 type Func interface {
@@ -157,6 +162,44 @@ func (fn Schaffer2) Bounds() (low, up []float64) {
 func (fn Schaffer2) Optima() []optim.Point {
 	return []optim.Point{
 		optim.Point{Pos: []float64{0, 0}, Val: 0},
+	}
+}
+
+type Styblinski struct {
+	NDim int
+}
+
+func (fn Styblinski) Name() string { return fmt.Sprintf("Styblinski%vD", fn.NDim) }
+
+func (fn Styblinski) Eval(x []float64) float64 {
+	if !InsideBounds(x, fn) {
+		return math.Inf(1)
+	}
+
+	tot := 0.0
+	for _, v := range x {
+		tot += math.Pow(v, 4) - 16*math.Pow(v, 2) + 5*v
+	}
+	return tot / 2
+}
+
+func (fn Styblinski) Bounds() (low, up []float64) {
+	low = make([]float64, fn.NDim)
+	up = make([]float64, fn.NDim)
+	for i := range low {
+		low[i] = -5
+		up[i] = 5
+	}
+	return low, up
+}
+
+func (fn Styblinski) Optima() []optim.Point {
+	pos := make([]float64, fn.NDim)
+	for i := range pos {
+		pos[i] = -2.903534
+	}
+	return []optim.Point{
+		optim.Point{Pos: pos, Val: -39.16599 * float64(fn.NDim)},
 	}
 }
 
