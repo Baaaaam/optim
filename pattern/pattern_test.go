@@ -30,11 +30,28 @@ func TestCompass(t *testing.T) {
 	}
 }
 
-func TestHybrid(t *testing.T) {
+func TestHybridNocache(t *testing.T) {
 	maxiter := 50000
 	for _, fn := range bench.AllFuncs {
 		optimum := fn.Optima()[0].Val
-		it := buildHybrid(fn)
+		it := buildHybrid(fn, false)
+
+		best, n, err := bench.Benchmark(it, fn, .01, maxiter)
+		if err != nil {
+			t.Errorf("[FAIL:%v] Error: %v", fn.Name(), err)
+		} else if n < maxiter {
+			t.Logf("[pass:%v] %v evals: optimum is %v, got %v", fn.Name(), n, optimum, best.Val)
+		} else {
+			t.Errorf("[FAIL:%v] optimum is %v, got %v", fn.Name(), optimum, best.Val)
+		}
+	}
+}
+
+func TestHybridCache(t *testing.T) {
+	maxiter := 50000
+	for _, fn := range bench.AllFuncs {
+		optimum := fn.Optima()[0].Val
+		it := buildHybrid(fn, true)
 
 		best, n, err := bench.Benchmark(it, fn, .01, maxiter)
 		if err != nil {
@@ -67,9 +84,13 @@ func buildIter(fn bench.Func) optim.Iterator {
 	return pattern.NewIterator(point, ev, p, s)
 }
 
-func buildHybrid(fn bench.Func) optim.Iterator {
+func buildHybrid(fn bench.Func, cache bool) optim.Iterator {
+	rand.Seed(1)
 	low, up := fn.Bounds()
-	ev := optim.NewCacheEvaler(optim.SerialEvaler{})
+	var ev optim.Evaler = optim.SerialEvaler{}
+	if cache {
+		ev = optim.NewCacheEvaler(optim.SerialEvaler{})
+	}
 
 	// configure pswarm solver
 	mv := &pswarm.SimpleMover{
@@ -84,7 +105,6 @@ func buildHybrid(fn bench.Func) optim.Iterator {
 		maxv[i] = minv[i] * 1.7
 	}
 
-	rand.Seed(time.Now().Unix())
 	pop := population.NewRandom(15*len(low), low, up, minv, maxv)
 
 	swarmiter := pswarm.SimpleIter{
@@ -103,7 +123,6 @@ func buildHybrid(fn bench.Func) optim.Iterator {
 		Contract: 0.5,
 	}
 
-	rand.Seed(time.Now().Unix())
 	point := optim.Point{Val: math.Inf(1)}
 	for _ = range low {
 		point.Pos = append(point.Pos, rand.Float64()*(max-min)+min)
