@@ -41,8 +41,6 @@ func (it *Iterator) Iterate(o optim.Objectiver, m mesh.Mesh) (best optim.Point, 
 	n += np
 	if err != nil {
 		return optim.Point{}, n, err
-	} else if it.p.StepSize() == 0 {
-		return best, n, errors.New("poller step size is zero")
 	} else if success {
 		it.curr = best
 		return best, n, nil

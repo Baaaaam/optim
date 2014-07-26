@@ -211,7 +211,7 @@ func Benchmark(it optim.Iterator, fn Func, tol float64, maxeval int) (best optim
 		best, n, err = it.Iterate(obj, nil)
 		neval += n
 		if err != nil {
-			return optim.Point{}, neval, err
+			return best, neval, err
 		} else if optimum == 0 && abs(optimum-best.Val) < 1e-10 {
 			return best, neval, nil
 		} else if optimum != 0 && abs(best.Val-optimum)/abs(optimum) < tol {
