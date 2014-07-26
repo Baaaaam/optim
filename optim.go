@@ -1,7 +1,10 @@
 package optim
 
 import (
+	"crypto/sha1"
+	"encoding/binary"
 	"fmt"
+	"math"
 
 	"github.com/rwcarlsen/optim/mesh"
 )
@@ -9,6 +12,14 @@ import (
 type Point struct {
 	Pos []float64
 	Val float64
+}
+
+func hashPoint(p Point) [64]byte {
+	data = make([]byte, len(p.Pos)*8)
+	for i, x := range p.Pos {
+		binary.BigEndian.PutUint64(data[i*8:], math.Float64bits(x))
+	}
+	return sha1.Sum(data)
 }
 
 type Iterator interface {
@@ -33,21 +44,34 @@ type Objectiver interface {
 	Objective(v []float64) (float64, error)
 }
 
-//type CacheEvaler struct {
-//	ev    Evaler
-//	cache map[[64]byte]float64
-//}
-//
-//func NewCacheEvaler(ev Evaler, dims int) *CacheEvaler {
-//	return &CacheEvaler{
-//		ev:    ev,
-//		cache: map[[64]byte]float64{},
-//	}
-//}
-//
-//func (ev CacheEvaler) Eval(obj Objectiver, points ...[]float64) (vals []float64, n int, err error) {
-//	for
-//}
+type CacheEvaler struct {
+	ev    Evaler
+	cache map[[64]byte]float64
+}
+
+func NewCacheEvaler(ev Evaler, dims int) *CacheEvaler {
+	return &CacheEvaler{
+		ev:    ev,
+		cache: map[[64]byte]float64{},
+	}
+}
+
+func (ev CacheEvaler) Eval(obj Objectiver, points ...Point) (results []optim.Point, err error) {
+	newp = make([]optim.Point, 0, len(points))
+	for _, p := range points {
+		if val, ok := ev.cache[hashPoint(p)]; ok {
+			results = append(results, Point{Pos: p.Pos, Val: val})
+		} else {
+			newp = append(newp, p)
+		}
+	}
+
+	newresults, err := ev.ev.Eval(obj, newp...)
+	for _, p := range newresults {
+		ev.cache[hashPoint(p)] = p.Val
+	}
+	return append(results, newresults...), err
+}
 
 type SerialEvaler struct {
 	ContinueOnErr bool
