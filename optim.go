@@ -49,14 +49,14 @@ type CacheEvaler struct {
 	cache map[[sha1.Size]byte]float64
 }
 
-func NewCacheEvaler(ev Evaler, dims int) *CacheEvaler {
+func NewCacheEvaler(ev Evaler) *CacheEvaler {
 	return &CacheEvaler{
 		ev:    ev,
 		cache: map[[sha1.Size]byte]float64{},
 	}
 }
 
-func (ev CacheEvaler) Eval(obj Objectiver, points ...Point) (results []Point, n int, err error) {
+func (ev *CacheEvaler) Eval(obj Objectiver, points ...Point) (results []Point, n int, err error) {
 	newp := make([]Point, 0, len(points))
 	for _, p := range points {
 		if val, ok := ev.cache[hashPoint(p)]; ok {

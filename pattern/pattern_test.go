@@ -69,7 +69,7 @@ func buildIter(fn bench.Func) optim.Iterator {
 
 func buildHybrid(fn bench.Func) optim.Iterator {
 	low, up := fn.Bounds()
-	ev := optim.SerialEvaler{}
+	ev := optim.NewCacheEvaler(optim.SerialEvaler{})
 
 	// configure pswarm solver
 	mv := &pswarm.SimpleMover{
