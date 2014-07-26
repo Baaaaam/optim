@@ -64,16 +64,16 @@ func (it SimpleIter) Iterate(obj optim.Objectiver, m mesh.Mesh) (best optim.Poin
 			points[i].Pos = m.Nearest(points[i].Pos)
 		}
 	}
-	results, err := it.Evaler.Eval(obj, points...)
+	results, n, err := it.Evaler.Eval(obj, points...)
 	if err != nil {
-		return optim.Point{}, len(results), err
+		return optim.Point{}, n, err
 	}
 	for i := range results {
 		it.Pop[i].Update(results[i].Val)
 	}
 
 	it.Mover.Move(it.Pop)
-	return it.Pop.Best(), len(results), nil
+	return it.Pop.Best(), n, nil
 }
 
 const (

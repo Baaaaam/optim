@@ -97,21 +97,21 @@ func (cp *CompassPoller) Poll(obj optim.Objectiver, ev optim.Evaler, from optim.
 		}
 	}
 
-	results, err := ev.Eval(obj, points...)
+	results, n, err := ev.Eval(obj, points...)
 	if err == nil || err == FoundBetterErr {
 		for i := range results {
 			if results[i].Val < from.Val {
 				cp.Step *= cp.Expand
 				cp.curr = results[i]
-				return true, cp.curr, len(results), nil
+				return true, cp.curr, n, nil
 			}
 		}
 	} else if err != nil {
-		return false, optim.Point{}, len(results), err
+		return false, optim.Point{}, n, err
 	}
 
 	cp.Step *= cp.Contract
-	return false, from, len(results), nil
+	return false, from, n, nil
 }
 
 type Searcher interface {
