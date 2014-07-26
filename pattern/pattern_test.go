@@ -85,7 +85,8 @@ func buildIter(fn bench.Func) optim.Iterator {
 }
 
 func buildHybrid(fn bench.Func, cache bool) optim.Iterator {
-	rand.Seed(time.Now().Unix())
+	//rand.Seed(time.Now().Unix())
+	rand.Seed(1)
 	low, up := fn.Bounds()
 	var ev optim.Evaler = optim.SerialEvaler{}
 	if cache {
