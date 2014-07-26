@@ -91,29 +91,29 @@ func (cp *CompassPoller) Poll(obj optim.Objectiver, ev optim.Evaler, from optim.
 	}
 	cp.curr = from
 
-	points := make([][]float64, len(cp.direcs))
+	points := make([]optim.Point, len(cp.direcs))
 	for i, dir := range cp.direcs {
-		points[i] = make([]float64, len(from.Pos))
+		points[i].Pos = make([]float64, 0, len(from.Pos))
 		for j, v := range dir {
-			points[i][j] = from.Pos[j] + cp.Step*v
+			points[i].Pos = append(points[i].Pos, from.Pos[j]+cp.Step*v)
 		}
 	}
 
-	results, n, err := ev.Eval(obj, points...)
+	results, err := ev.Eval(obj, points...)
 	if err == nil || err == FoundBetterErr {
 		for i := range results {
-			if results[i] < from.Val {
+			if results[i].Val < from.Val {
 				cp.Step *= cp.Expand
-				cp.curr = optim.Point{Pos: points[i], Val: results[i]}
-				return true, cp.curr, n, nil
+				cp.curr = results[i]
+				return true, cp.curr, len(results), nil
 			}
 		}
 	} else if err != nil {
-		return false, optim.Point{}, n, err
+		return false, optim.Point{}, len(results), err
 	}
 
 	cp.Step *= cp.Contract
-	return false, from, n, nil
+	return false, from, len(results), nil
 }
 
 type Searcher interface {

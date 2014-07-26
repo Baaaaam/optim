@@ -2,7 +2,6 @@ package optim
 
 import (
 	"fmt"
-	"math"
 
 	"github.com/rwcarlsen/optim/mesh"
 )
@@ -20,10 +19,9 @@ type Iterator interface {
 
 type Evaler interface {
 	// Eval evaluates each point using obj and returns the values and number
-	// of function evaluations n.  Length of the returned vals slice must
-	// always be equal to the number of points.  Unevaluated points should
-	// have their vals slice entries set to positive infinity.
-	Eval(obj Objectiver, points ...[]float64) (vals []float64, n int, err error)
+	// of function evaluations n.  Unevaluated points should not be returned
+	// in the results slice.
+	Eval(obj Objectiver, points ...Point) (results []Point, err error)
 }
 
 type Objectiver interface {
@@ -35,22 +33,36 @@ type Objectiver interface {
 	Objective(v []float64) (float64, error)
 }
 
+//type CacheEvaler struct {
+//	ev    Evaler
+//	cache map[[64]byte]float64
+//}
+//
+//func NewCacheEvaler(ev Evaler, dims int) *CacheEvaler {
+//	return &CacheEvaler{
+//		ev:    ev,
+//		cache: map[[64]byte]float64{},
+//	}
+//}
+//
+//func (ev CacheEvaler) Eval(obj Objectiver, points ...[]float64) (vals []float64, n int, err error) {
+//	for
+//}
+
 type SerialEvaler struct {
 	ContinueOnErr bool
 }
 
-func (ev SerialEvaler) Eval(obj Objectiver, points ...[]float64) (vals []float64, n int, err error) {
-	vals = make([]float64, len(points))
-	for i := range vals {
-		vals[i] = math.Inf(1)
-	}
+func (ev SerialEvaler) Eval(obj Objectiver, points ...Point) (results []Point, err error) {
+	results = make([]Point, len(points))
 	for i, p := range points {
-		vals[i], err = obj.Objective(p)
+		results[i].Pos = append([]float64{}, p.Pos...)
+		results[i].Val, err = obj.Objective(p.Pos)
 		if err != nil && !ev.ContinueOnErr {
-			return vals, i + 1, err
+			return results, err
 		}
 	}
-	return vals, len(points), nil
+	return results, nil
 }
 
 type SimpleObjectiver func([]float64) float64

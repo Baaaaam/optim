@@ -24,7 +24,7 @@ type Infinite struct {
 
 func (sm *Infinite) Nearest(p []float64) []float64 {
 	if sm.Step == 0 {
-		panic("Infinite has step size 0")
+		return append([]float64{}, p...)
 	} else if sm.Origin != nil && len(sm.Origin) != len(p) {
 		panic("point passed to Nearest is has wrong length")
 	}

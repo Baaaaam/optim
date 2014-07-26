@@ -8,42 +8,39 @@ import (
 )
 
 type Particle struct {
-	Id      int
-	Pos     []float64
-	Vel     []float64
-	Val     float64
-	BestVal float64
-	BestPos []float64
+	Id   int
+	Pos  []float64
+	Vel  []float64
+	Val  float64
+	Best optim.Point
 }
 
 func (p *Particle) Update(newval float64) {
 	p.Val = newval
-	if p.Val < p.BestVal || p.BestPos == nil {
-		p.BestVal = p.Val
-		p.BestPos = append([]float64{}, p.Pos...)
+	if p.Val < p.Best.Val || p.Best.Pos == nil {
+		p.Best.Val = p.Val
+		p.Best.Pos = append([]float64{}, p.Pos...)
 	}
 }
 
 type Population []*Particle
 
-func (pop Population) Points() [][]float64 {
-	points := make([][]float64, len(pop))
+func (pop Population) Points() []optim.Point {
+	points := make([]optim.Point, len(pop))
 	for i := range pop {
-		points[i] = append([]float64{}, pop[i].Pos...)
+		points[i].Pos = append([]float64{}, pop[i].Pos...)
 	}
 	return points
 }
 
-func (pop Population) Best() (val float64, pos []float64) {
-	val = pop[0].BestVal
-	pos = pop[0].BestPos
+func (pop Population) Best() optim.Point {
+	best := pop[0].Best
 	for _, p := range pop[1:] {
-		if p.BestVal < val {
-			val = p.BestVal
-			pos = p.BestPos
+		if p.Best.Val < best.Val {
+			best = p.Best
 		}
 	}
-	return val, pos
+	return best
 }
 
 // mover tracks constraints:
@@ -64,20 +61,19 @@ func (it SimpleIter) Iterate(obj optim.Objectiver, m mesh.Mesh) (best optim.Poin
 	points := it.Pop.Points()
 	if m != nil {
 		for i := range points {
-			points[i] = m.Nearest(points[i])
+			points[i].Pos = m.Nearest(points[i].Pos)
 		}
 	}
-	vals, n, err := it.Evaler.Eval(obj, points...)
+	results, err := it.Evaler.Eval(obj, points...)
 	if err != nil {
-		return optim.Point{}, n, err
+		return optim.Point{}, len(results), err
 	}
-	for i := range vals {
-		it.Pop[i].Update(vals[i])
+	for i := range results {
+		it.Pop[i].Update(results[i].Val)
 	}
 
 	it.Mover.Move(it.Pop)
-	val, pos := it.Pop.Best()
-	return optim.Point{Pos: pos, Val: val}, n, nil
+	return it.Pop.Best(), len(results), nil
 }
 
 const (
@@ -104,7 +100,7 @@ func (mv *SimpleMover) Move(pop Population) {
 		}
 	}
 
-	_, bestPos := pop.Best()
+	bestPos := pop.Best().Pos
 
 	for _, p := range pop {
 		w1 := mv.Rng.Float64()
@@ -112,7 +108,7 @@ func (mv *SimpleMover) Move(pop Population) {
 		// update velocity
 		for i, currv := range p.Vel {
 			p.Vel[i] = mv.InertiaFn()*currv +
-				mv.Cognition*w1*(p.BestPos[i]-p.Pos[i]) +
+				mv.Cognition*w1*(p.Best.Pos[i]-p.Pos[i]) +
 				mv.Social*w2*(bestPos[i]-p.Pos[i])
 		}
 
