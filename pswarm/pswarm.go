@@ -43,10 +43,6 @@ func (pop Population) Best() optim.Point {
 	return best
 }
 
-// mover tracks constraints:
-//    ConstrA   *mat64.Dense
-//    Constrb   *mat64.Dense
-// Must update the particles' position, velocity,
 type Mover interface {
 	Move(p Population)
 }
@@ -55,6 +51,12 @@ type SimpleIter struct {
 	Pop Population
 	optim.Evaler
 	Mover
+}
+
+func (it SimpleIter) AddPoint(p optim.Point) {
+	if p.Val < it.Pop.Best().Val {
+		it.Pop[0].Best = p
+	}
 }
 
 func (it SimpleIter) Iterate(obj optim.Objectiver, m mesh.Mesh) (best optim.Point, neval int, err error) {

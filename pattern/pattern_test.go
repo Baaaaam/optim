@@ -85,7 +85,7 @@ func buildIter(fn bench.Func) optim.Iterator {
 }
 
 func buildHybrid(fn bench.Func, cache bool) optim.Iterator {
-	rand.Seed(1)
+	rand.Seed(time.Now().Unix())
 	low, up := fn.Bounds()
 	var ev optim.Evaler = optim.SerialEvaler{}
 	if cache {
@@ -123,9 +123,9 @@ func buildHybrid(fn bench.Func, cache bool) optim.Iterator {
 		Contract: 0.5,
 	}
 
-	point := optim.Point{Val: math.Inf(1)}
-	for _ = range low {
-		point.Pos = append(point.Pos, rand.Float64()*(max-min)+min)
+	point := optim.Point{Val: math.Inf(1), Pos: make([]float64, len(low))}
+	for i := range low {
+		point.Pos[i] = rand.Float64()*(max-min) + min
 	}
 	return pattern.NewIterator(point, ev, p, s)
 }

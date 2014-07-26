@@ -26,6 +26,8 @@ type Iterator interface {
 	// Iterate runs a single iteration of a solver and reports the number of
 	// function evaluations n and the best point.
 	Iterate(obj Objectiver, m mesh.Mesh) (best Point, n int, err error)
+
+	AddPoint(p Point)
 }
 
 type Evaler interface {
@@ -78,10 +80,10 @@ type SerialEvaler struct {
 }
 
 func (ev SerialEvaler) Eval(obj Objectiver, points ...Point) (results []Point, n int, err error) {
-	results = make([]Point, len(points))
-	for i, p := range points {
-		results[i].Pos = append([]float64{}, p.Pos...)
-		results[i].Val, err = obj.Objective(p.Pos)
+	results = make([]Point, 0, len(points))
+	for _, p := range points {
+		val, err := obj.Objective(p.Pos)
+		results = append(results, Point{Pos: append([]float64{}, p.Pos...), Val: val})
 		if err != nil && !ev.ContinueOnErr {
 			return results, len(results), err
 		}

@@ -25,6 +25,12 @@ func NewIterator(start optim.Point, e optim.Evaler, p Poller, s Searcher) *Itera
 	}
 }
 
+func (it *Iterator) AddPoint(p optim.Point) {
+	if p.Val < it.curr.Val {
+		it.curr = p
+	}
+}
+
 func (it *Iterator) Iterate(o optim.Objectiver, m mesh.Mesh) (best optim.Point, n int, err error) {
 	obj := &ObjStopper{Objectiver: o}
 	success, best, ns, err := it.s.Search(o, it.p.Mesh(), it.curr)
@@ -91,27 +97,29 @@ func (cp *CompassPoller) Poll(obj optim.Objectiver, ev optim.Evaler, from optim.
 
 	points := make([]optim.Point, len(cp.direcs))
 	for i, dir := range cp.direcs {
-		points[i].Pos = make([]float64, 0, len(from.Pos))
+		points[i].Pos = make([]float64, len(from.Pos))
 		for j, v := range dir {
-			points[i].Pos = append(points[i].Pos, from.Pos[j]+cp.Step*v)
+			points[i].Pos[j] = from.Pos[j] + cp.Step*v
 		}
 	}
 
 	results, n, err := ev.Eval(obj, points...)
+
 	if err == nil || err == FoundBetterErr {
 		for i := range results {
-			if results[i].Val < from.Val {
-				cp.Step *= cp.Expand
+			if results[i].Val < cp.curr.Val {
 				cp.curr = results[i]
-				return true, cp.curr, n, nil
 			}
+		}
+		if cp.curr.Val < from.Val {
+			cp.Step *= cp.Expand
+			return true, cp.curr, n, nil
 		}
 	} else if err != nil {
 		return false, optim.Point{}, n, err
 	}
-
 	cp.Step *= cp.Contract
-	return false, from, n, nil
+	return false, cp.curr, n, nil
 }
 
 type Searcher interface {
@@ -129,6 +137,7 @@ type WrapSearcher struct {
 }
 
 func (s *WrapSearcher) Search(o optim.Objectiver, m mesh.Mesh, curr optim.Point) (success bool, best optim.Point, n int, err error) {
+	s.Iter.AddPoint(curr)
 	best, n, err = s.Iter.Iterate(o, m)
 	if err != nil {
 		return false, optim.Point{}, n, err
