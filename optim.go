@@ -10,14 +10,30 @@ import (
 )
 
 type Point struct {
-	Pos []float64
+	pos []float64
 	Val float64
 }
 
+func NewPoint(pos []float64, val float64) Point {
+	cpos := make([]float64, len(pos))
+	copy(cpos, pos)
+	return Point{pos: cpos, Val: val}
+}
+
+func (p Point) At(i int) float64 { return p.pos[i] }
+
+func (p Point) Len() int { return len(p.pos) }
+
+func (p Point) Pos() []float64 {
+	pos := make([]float64, len(p.pos))
+	copy(pos, p.pos)
+	return pos
+}
+
 func hashPoint(p Point) [sha1.Size]byte {
-	data := make([]byte, len(p.Pos)*8)
-	for i, x := range p.Pos {
-		binary.BigEndian.PutUint64(data[i*8:], math.Float64bits(x))
+	data := make([]byte, p.Len()*8)
+	for i := 0; i < p.Len(); i++ {
+		binary.BigEndian.PutUint64(data[i*8:], math.Float64bits(p.At(i)))
 	}
 	return sha1.Sum(data)
 }
@@ -59,11 +75,13 @@ func NewCacheEvaler(ev Evaler) *CacheEvaler {
 }
 
 func (ev *CacheEvaler) Eval(obj Objectiver, points ...Point) (results []Point, n int, err error) {
+	fromnew := make([]int, 0, len(points))
 	newp := make([]Point, 0, len(points))
-	for _, p := range points {
+	for i, p := range points {
 		if val, ok := ev.cache[hashPoint(p)]; ok {
-			results = append(results, Point{Pos: p.Pos, Val: val})
+			p.Val = val
 		} else {
+			fromnew = append(fromnew, i)
 			newp = append(newp, p)
 		}
 	}
@@ -72,7 +90,17 @@ func (ev *CacheEvaler) Eval(obj Objectiver, points ...Point) (results []Point, n
 	for _, p := range newresults {
 		ev.cache[hashPoint(p)] = p.Val
 	}
-	return append(results, newresults...), n, err
+
+	for i, p := range newresults {
+		points[fromnew[i]].Val = p.Val
+	}
+
+	// shrink if error resulted in fewer new results being returned
+	if len(fromnew) > 0 {
+		points = points[:fromnew[len(newresults)-1]+1]
+	}
+
+	return points, n, err
 }
 
 type SerialEvaler struct {
@@ -82,8 +110,8 @@ type SerialEvaler struct {
 func (ev SerialEvaler) Eval(obj Objectiver, points ...Point) (results []Point, n int, err error) {
 	results = make([]Point, 0, len(points))
 	for _, p := range points {
-		val, err := obj.Objective(p.Pos)
-		results = append(results, Point{Pos: append([]float64{}, p.Pos...), Val: val})
+		p.Val, err = obj.Objective(p.Pos())
+		results = append(results, p)
 		if err != nil && !ev.ContinueOnErr {
 			return results, len(results), err
 		}

@@ -2,6 +2,7 @@ package pattern
 
 import (
 	"errors"
+	"math"
 
 	"github.com/rwcarlsen/optim"
 	"github.com/rwcarlsen/optim/mesh"
@@ -32,7 +33,6 @@ func (it *Iterator) AddPoint(p optim.Point) {
 }
 
 func (it *Iterator) Iterate(o optim.Objectiver, m mesh.Mesh) (best optim.Point, n int, err error) {
-	obj := &ObjStopper{Objectiver: o}
 	success, best, ns, err := it.s.Search(o, it.p.Mesh(), it.curr)
 	n += ns
 	if err != nil {
@@ -42,7 +42,7 @@ func (it *Iterator) Iterate(o optim.Objectiver, m mesh.Mesh) (best optim.Point, 
 		return best, n, nil
 	}
 
-	obj.Best = it.curr.Val
+	obj := &ObjStopper{Objectiver: o, Best: it.curr.Val}
 	success, best, np, err := it.p.Poll(obj, it.ev, it.curr)
 	n += np
 	if err != nil {
@@ -84,23 +84,24 @@ func (cp *CompassPoller) StepSize() float64 { return cp.Step }
 
 func (cp *CompassPoller) Mesh() mesh.Mesh {
 	return &mesh.Infinite{
-		Origin: cp.curr.Pos,
+		Origin: cp.curr.Pos(),
 		Step:   cp.Step,
 	}
 }
 
 func (cp *CompassPoller) Poll(obj optim.Objectiver, ev optim.Evaler, from optim.Point) (success bool, best optim.Point, neval int, err error) {
 	if cp.direcs == nil {
-		cp.direcs = generateDirecs(len(from.Pos))
+		cp.direcs = generateDirecs(from.Len())
 	}
 	cp.curr = from
 
-	points := make([]optim.Point, len(cp.direcs))
-	for i, dir := range cp.direcs {
-		points[i].Pos = make([]float64, len(from.Pos))
+	points := make([]optim.Point, 0, len(cp.direcs))
+	for _, dir := range cp.direcs {
+		pos := make([]float64, len(dir))
 		for j, v := range dir {
-			points[i].Pos[j] = from.Pos[j] + cp.Step*v
+			pos[j] = from.At(j) + cp.Step*v
 		}
+		points = append(points, optim.NewPoint(pos, math.Inf(1)))
 	}
 
 	results, n, err := ev.Eval(obj, points...)
@@ -118,7 +119,11 @@ func (cp *CompassPoller) Poll(obj optim.Objectiver, ev optim.Evaler, from optim.
 	} else if err != nil {
 		return false, optim.Point{}, n, err
 	}
+
 	cp.Step *= cp.Contract
+	if cp.Step == 0 {
+		return false, cp.curr, n, errors.New("polling step is contracted to zero")
+	}
 	return false, cp.curr, n, nil
 }
 

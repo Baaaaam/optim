@@ -59,7 +59,7 @@ func (fn Ackley) Bounds() (low, up []float64) {
 
 func (fn Ackley) Optima() []optim.Point {
 	return []optim.Point{
-		optim.Point{Pos: []float64{0, 0}, Val: 0},
+		optim.NewPoint([]float64{0, 0}, 0),
 	}
 }
 
@@ -83,10 +83,10 @@ func (fn CrossTray) Bounds() (low, up []float64) {
 
 func (fn CrossTray) Optima() []optim.Point {
 	return []optim.Point{
-		optim.Point{Pos: []float64{1.34941, -1.34941}, Val: -2.06261},
-		optim.Point{Pos: []float64{1.34941, 1.34941}, Val: -2.06261},
-		optim.Point{Pos: []float64{-1.34941, 1.34941}, Val: -2.06261},
-		optim.Point{Pos: []float64{-1.34941, -1.34941}, Val: -2.06261},
+		optim.NewPoint([]float64{1.34941, -1.34941}, -2.06261),
+		optim.NewPoint([]float64{1.34941, 1.34941}, -2.06261),
+		optim.NewPoint([]float64{-1.34941, 1.34941}, -2.06261),
+		optim.NewPoint([]float64{-1.34941, -1.34941}, -2.06261),
 	}
 }
 
@@ -110,7 +110,7 @@ func (fn Eggholder) Bounds() (low, up []float64) {
 
 func (fn Eggholder) Optima() []optim.Point {
 	return []optim.Point{
-		optim.Point{Pos: []float64{512, 404.2319}, Val: -959.6407},
+		optim.NewPoint([]float64{512, 404.2319}, -959.6407),
 	}
 }
 
@@ -134,10 +134,10 @@ func (fn HolderTable) Bounds() (low, up []float64) {
 
 func (fn HolderTable) Optima() []optim.Point {
 	return []optim.Point{
-		optim.Point{Pos: []float64{8.05502, 9.66459}, Val: -19.2085},
-		optim.Point{Pos: []float64{-8.05502, 9.66459}, Val: -19.2085},
-		optim.Point{Pos: []float64{8.05502, -9.66459}, Val: -19.2085},
-		optim.Point{Pos: []float64{-8.05502, -9.66459}, Val: -19.2085},
+		optim.NewPoint([]float64{8.05502, 9.66459}, -19.2085),
+		optim.NewPoint([]float64{-8.05502, 9.66459}, -19.2085),
+		optim.NewPoint([]float64{8.05502, -9.66459}, -19.2085),
+		optim.NewPoint([]float64{-8.05502, -9.66459}, -19.2085),
 	}
 }
 
@@ -161,7 +161,7 @@ func (fn Schaffer2) Bounds() (low, up []float64) {
 
 func (fn Schaffer2) Optima() []optim.Point {
 	return []optim.Point{
-		optim.Point{Pos: []float64{0, 0}, Val: 0},
+		optim.NewPoint([]float64{0, 0}, 0),
 	}
 }
 
@@ -199,7 +199,7 @@ func (fn Styblinski) Optima() []optim.Point {
 		pos[i] = -2.903534
 	}
 	return []optim.Point{
-		optim.Point{Pos: pos, Val: -39.16599 * float64(fn.NDim)},
+		optim.NewPoint(pos, -39.16599*float64(fn.NDim)),
 	}
 }
 

@@ -8,27 +8,25 @@ import (
 )
 
 type Particle struct {
-	Id   int
-	Pos  []float64
+	Id int
+	optim.Point
 	Vel  []float64
-	Val  float64
 	Best optim.Point
 }
 
 func (p *Particle) Update(newval float64) {
 	p.Val = newval
-	if p.Val < p.Best.Val || p.Best.Pos == nil {
+	if p.Val < p.Best.Val || p.Best.Len() == 0 {
 		p.Best.Val = p.Val
-		p.Best.Pos = append([]float64{}, p.Pos...)
 	}
 }
 
 type Population []*Particle
 
 func (pop Population) Points() []optim.Point {
-	points := make([]optim.Point, len(pop))
-	for i := range pop {
-		points[i].Pos = append([]float64{}, pop[i].Pos...)
+	points := make([]optim.Point, 0, len(pop))
+	for _, p := range pop {
+		points = append(points, p.Point)
 	}
 	return points
 }
@@ -62,14 +60,15 @@ func (it SimpleIter) AddPoint(p optim.Point) {
 func (it SimpleIter) Iterate(obj optim.Objectiver, m mesh.Mesh) (best optim.Point, neval int, err error) {
 	points := it.Pop.Points()
 	if m != nil {
-		for i := range points {
-			points[i].Pos = m.Nearest(points[i].Pos)
+		for i, p := range points {
+			points[i] = optim.NewPoint(m.Nearest(p.Pos()), p.Val)
 		}
 	}
 	results, n, err := it.Evaler.Eval(obj, points...)
 	if err != nil {
 		return optim.Point{}, n, err
 	}
+
 	for i := range results {
 		it.Pop[i].Update(results[i].Val)
 	}
@@ -93,7 +92,7 @@ type SimpleMover struct {
 
 func (mv *SimpleMover) Move(pop Population) {
 	if mv.Rng == nil {
-		src := rand.NewSource(0)
+		src := rand.NewSource(1)
 		mv.Rng = rand.New(src)
 	}
 	if mv.InertiaFn == nil {
@@ -102,7 +101,7 @@ func (mv *SimpleMover) Move(pop Population) {
 		}
 	}
 
-	bestPos := pop.Best().Pos
+	best := pop.Best()
 
 	for _, p := range pop {
 		w1 := mv.Rng.Float64()
@@ -110,13 +109,15 @@ func (mv *SimpleMover) Move(pop Population) {
 		// update velocity
 		for i, currv := range p.Vel {
 			p.Vel[i] = mv.InertiaFn()*currv +
-				mv.Cognition*w1*(p.Best.Pos[i]-p.Pos[i]) +
-				mv.Social*w2*(bestPos[i]-p.Pos[i])
+				mv.Cognition*w1*(best.At(i)-p.At(i)) +
+				mv.Social*w2*(best.At(i)-p.At(i))
 		}
 
 		// update position
-		for i := range p.Pos {
-			p.Pos[i] += p.Vel[i]
+		pos := make([]float64, p.Len())
+		for i := range pos {
+			pos[i] = p.At(i) + p.Vel[i]
 		}
+		p.Point = optim.NewPoint(pos, p.Val)
 	}
 }

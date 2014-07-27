@@ -1,6 +1,7 @@
 package mesh
 
 import (
+	"fmt"
 	"math"
 
 	"github.com/gonum/blas/goblas"
@@ -25,12 +26,12 @@ type Infinite struct {
 func (sm *Infinite) Nearest(p []float64) []float64 {
 	if sm.Step == 0 {
 		return append([]float64{}, p...)
-	} else if sm.Origin != nil && len(sm.Origin) != len(p) {
-		panic("point passed to Nearest is has wrong length")
+	} else if l := len(sm.Origin); l != 0 && l != len(p) {
+		panic(fmt.Sprintf("origin len %v incompatible with point len %v", l, len(p)))
 	}
 
 	// set up origin, basis, and inverter if necessary
-	if sm.Origin == nil {
+	if len(sm.Origin) == 0 {
 		sm.Origin = make([]float64, len(p))
 	}
 	if sm.Basis == nil {

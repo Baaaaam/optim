@@ -3,7 +3,6 @@ package pswarm_test
 import (
 	"math/rand"
 	"testing"
-	"time"
 
 	"github.com/rwcarlsen/optim"
 	"github.com/rwcarlsen/optim/bench"
@@ -41,7 +40,7 @@ func buildIter(fn bench.Func) optim.Iterator {
 		maxv[i] = minv[i] * 1.7
 	}
 
-	rand.Seed(time.Now().Unix())
+	rand.Seed(1)
 	pop := population.NewRandom(15*len(low), low, up, minv, maxv)
 
 	return pswarm.SimpleIter{

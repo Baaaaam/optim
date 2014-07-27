@@ -7,11 +7,11 @@ import (
 )
 
 var tpoints = []Point{
-	Point{Pos: []float64{1, 2, 3}, Val: 0},
-	Point{Pos: []float64{1, 2, 4}, Val: 0},
-	Point{Pos: []float64{1, 2, 5}, Val: 0},
-	Point{Pos: []float64{1, 2, 6}, Val: 0},
-	Point{Pos: []float64{1, 2, 7}, Val: 0},
+	NewPoint([]float64{1, 2, 3}, 0),
+	NewPoint([]float64{1, 2, 4}, 0),
+	NewPoint([]float64{1, 2, 5}, 0),
+	NewPoint([]float64{1, 2, 6}, 0),
+	NewPoint([]float64{1, 2, 7}, 0),
 }
 
 type ObjTest struct {
@@ -81,15 +81,15 @@ func TestCacheEvaler(t *testing.T) {
 		t.Errorf("returned wrong evaluation count: expected %v, got %v", len(tpoints), n1+n2)
 	}
 	if err1 != nil || err2 != nil {
-		t.Errorf("got unexpected (err2 and err2): %v and %v", err1, err2)
+		t.Errorf("got unexpected err (err1 and err2): %v and %v", err1, err2)
 	}
 
 	for i := range r1 {
-		for j := range tpoints[i].Pos {
-			if exp, got := tpoints[i].Pos[j], r1[i].Pos[j]; exp != got {
+		for j := range tpoints[i].Pos() {
+			if exp, got := tpoints[i].At(j), r1[i].At(j); exp != got {
 				t.Errorf("bad pos: expected %+v, got %+v", exp, got)
 			}
-			if exp, got := tpoints[i].Pos[j], r2[i].Pos[j]; exp != got {
+			if exp, got := tpoints[i].At(j), r2[i].At(j); exp != got {
 				t.Errorf("bad cached pos: expected %+v, got %+v", exp, got)
 			}
 		}
