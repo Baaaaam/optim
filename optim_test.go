@@ -6,32 +6,40 @@ import (
 	"testing"
 )
 
-const errcount = 3
-
-var tpoint = Point{
-	Pos: []float64{1, 2, 3},
-	Val: 0,
+var tpoints = []Point{
+	Point{Pos: []float64{1, 2, 3}, Val: 0},
+	Point{Pos: []float64{1, 2, 4}, Val: 0},
+	Point{Pos: []float64{1, 2, 5}, Val: 0},
+	Point{Pos: []float64{1, 2, 6}, Val: 0},
+	Point{Pos: []float64{1, 2, 7}, Val: 0},
 }
 
-type ErrObj struct {
+type ObjTest struct {
 	count int
+	max   int
 }
 
-func (o *ErrObj) Objective(x []float64) (float64, error) {
+func (o *ObjTest) Objective(x []float64) (float64, error) {
 	o.count++
-	if o.count >= errcount {
+	if o.count >= o.max {
 		return math.Inf(1), errors.New("fake error")
 	}
-	return 0, nil
+	tot := 0.0
+	for _, v := range x {
+		tot += v
+	}
+	return tot, nil
 }
 
 func TestSerialEvalerErr(t *testing.T) {
-	obj := &ErrObj{}
+	errcount := 3
+	obj := &ObjTest{max: errcount}
 	ev := SerialEvaler{}
 
-	results, n, err := ev.Eval(obj, tpoint, tpoint, tpoint, tpoint, tpoint)
-	if len(results) != errcount {
-		t.Errorf("returned wrong number of results: expected %v, got %v", errcount, len(results))
+	r, n, err := ev.Eval(obj, tpoints...)
+
+	if len(r) != errcount {
+		t.Errorf("returned wrong number of r: expected %v, got %v", errcount, len(r))
 	}
 	if n != errcount {
 		t.Errorf("returned wrong evaluation count: expected %v, got %v", errcount, n)
@@ -42,18 +50,48 @@ func TestSerialEvalerErr(t *testing.T) {
 }
 
 func TestCacheEvalerErr(t *testing.T) {
-	obj := &ErrObj{}
+	errcount := 3
+	obj := &ObjTest{max: errcount}
 	ev := NewCacheEvaler(SerialEvaler{})
-	r1, n1, _ := ev.Eval(obj, tpoint)
-	r2, n2, err := ev.Eval(obj, tpoint, tpoint, tpoint, tpoint)
 
-	if v := len(r1) + len(r2); v != errcount {
-		t.Errorf("returned wrong number of results: expected %v, got %v", errcount, v)
+	r, n, err := ev.Eval(obj, tpoints...)
+
+	if len(r) != errcount {
+		t.Errorf("returned wrong number of r: expected %v, got %v", errcount, len(r))
 	}
-	if n1+n2 != 1 {
-		t.Errorf("returned wrong evaluation count: expected 1, got %v", n1+n2)
+	if n != errcount {
+		t.Errorf("returned wrong evaluation count: expected %v, got %v", errcount, n)
 	}
-	if err != nil {
-		t.Errorf("failed to prevent extra evaluations")
+	if err == nil {
+		t.Errorf("did not propogate error through return")
+	}
+}
+
+func TestCacheEvaler(t *testing.T) {
+	obj := &ObjTest{max: 100000}
+	ev := NewCacheEvaler(SerialEvaler{})
+
+	r1, n1, err1 := ev.Eval(obj, tpoints...)
+	r2, n2, err2 := ev.Eval(obj, tpoints...)
+
+	if v := len(r1) + len(r2); v != 2*len(tpoints) {
+		t.Errorf("returned wrong number of results: expected %v, got %v", 2*len(tpoints), v)
+	}
+	if n1+n2 != len(tpoints) {
+		t.Errorf("returned wrong evaluation count: expected %v, got %v", len(tpoints), n1+n2)
+	}
+	if err1 != nil || err2 != nil {
+		t.Errorf("got unexpected (err2 and err2): %v and %v", err1, err2)
+	}
+
+	for i := range r1 {
+		for j := range tpoints[i].Pos {
+			if exp, got := tpoints[i].Pos[j], r1[i].Pos[j]; exp != got {
+				t.Errorf("bad pos: expected %+v, got %+v", exp, got)
+			}
+			if exp, got := tpoints[i].Pos[j], r2[i].Pos[j]; exp != got {
+				t.Errorf("bad cached pos: expected %+v, got %+v", exp, got)
+			}
+		}
 	}
 }
