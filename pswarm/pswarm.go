@@ -14,10 +14,10 @@ type Particle struct {
 	Best optim.Point
 }
 
-func (p *Particle) Update(newval float64) {
-	p.Val = newval
+func (p *Particle) Update(newp optim.Point) {
+	p.Val = newp.Val
 	if p.Val < p.Best.Val || p.Best.Len() == 0 {
-		p.Best.Val = p.Val
+		p.Best = newp
 	}
 }
 
@@ -70,7 +70,7 @@ func (it SimpleIter) Iterate(obj optim.Objectiver, m mesh.Mesh) (best optim.Poin
 	}
 
 	for i := range results {
-		it.Pop[i].Update(results[i].Val)
+		it.Pop[i].Update(results[i])
 	}
 
 	it.Mover.Move(it.Pop)

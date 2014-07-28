@@ -168,7 +168,7 @@ type Styblinski struct {
 	NDim int
 }
 
-func (fn Styblinski) Name() string { return fmt.Sprintf("Styblinski%vD", fn.NDim) }
+func (fn Styblinski) Name() string { return fmt.Sprintf("Styblinski_%vD", fn.NDim) }
 
 func (fn Styblinski) Eval(x []float64) float64 {
 	if !InsideBounds(x, fn) {

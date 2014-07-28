@@ -36,7 +36,7 @@ func (it *Iterator) Iterate(o optim.Objectiver, m mesh.Mesh) (best optim.Point, 
 	success, best, ns, err := it.s.Search(o, it.p.Mesh(), it.curr)
 	n += ns
 	if err != nil {
-		return optim.Point{}, n, err
+		return best, n, err
 	} else if success {
 		it.curr = best
 		return best, n, nil
@@ -48,25 +48,25 @@ func (it *Iterator) Iterate(o optim.Objectiver, m mesh.Mesh) (best optim.Point, 
 	if err != nil {
 		return it.curr, n, err
 	} else if success {
+		it.p.Resize(2.0)
 		it.curr = best
 		return best, n, nil
 	} else {
-		return it.curr, n, nil
+		err := it.p.Resize(0.5)
+		return it.curr, n, err
 	}
 }
 
 type Poller interface {
 	Poll(obj optim.Objectiver, ev optim.Evaler, from optim.Point) (success bool, best optim.Point, neval int, err error)
-	StepSize() float64
+	Resize(mult float64) error
 	Mesh() mesh.Mesh
 }
 
 type CompassPoller struct {
-	Step     float64
-	Expand   float64
-	Contract float64
-	direcs   [][]float64
-	curr     optim.Point
+	Step   float64
+	direcs [][]float64
+	curr   optim.Point
 }
 
 func generateDirecs(ndim int) [][]float64 {
@@ -107,24 +107,28 @@ func (cp *CompassPoller) Poll(obj optim.Objectiver, ev optim.Evaler, from optim.
 	results, n, err := ev.Eval(obj, points...)
 
 	if err == nil || err == FoundBetterErr {
+		err = nil
 		for i := range results {
 			if results[i].Val < cp.curr.Val {
 				cp.curr = results[i]
 			}
 		}
 		if cp.curr.Val < from.Val {
-			cp.Step *= cp.Expand
 			return true, cp.curr, n, nil
 		}
 	} else if err != nil {
-		return false, optim.Point{}, n, err
+		return false, cp.curr, n, err
 	}
 
-	cp.Step *= cp.Contract
-	if cp.Step == 0 {
-		return false, cp.curr, n, errors.New("poll step size contracted to zero")
-	}
 	return false, cp.curr, n, nil
+}
+
+func (cp *CompassPoller) Resize(mult float64) error {
+	cp.Step *= mult
+	if cp.Step == 0 {
+		return errors.New("poll step size contracted to zero")
+	}
+	return nil
 }
 
 type Searcher interface {
