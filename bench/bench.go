@@ -27,6 +27,9 @@ var AllFuncs = []Func{
 	Styblinski{NDim: 1},
 	Styblinski{NDim: 10},
 	Styblinski{NDim: 100},
+	Rosenbrock{NDim: 2},
+	Rosenbrock{NDim: 10},
+	Rosenbrock{NDim: 100},
 }
 
 type Func interface {
@@ -199,6 +202,44 @@ func (fn Styblinski) Optima() []optim.Point {
 	}
 	return []optim.Point{
 		optim.NewPoint(pos, -39.16599*float64(fn.NDim)),
+	}
+}
+
+type Rosenbrock struct {
+	NDim int
+}
+
+func (fn Rosenbrock) Name() string { return fmt.Sprintf("Rosenbrock_%vD", fn.NDim) }
+
+func (fn Rosenbrock) Eval(x []float64) float64 {
+	if !InsideBounds(x, fn) {
+		return math.Inf(1)
+	}
+
+	tot := 0.0
+	for i := 0; i < fn.NDim-1; i++ {
+		tot += 100*math.Pow(x[i+1]-x[i]*x[i], 2) + math.Pow(x[i]-1, 2)
+	}
+	return tot
+}
+
+func (fn Rosenbrock) Bounds() (low, up []float64) {
+	low = make([]float64, fn.NDim)
+	up = make([]float64, fn.NDim)
+	for i := range low {
+		low[i] = -1e5
+		up[i] = 1e5
+	}
+	return low, up
+}
+
+func (fn Rosenbrock) Optima() []optim.Point {
+	pos := make([]float64, fn.NDim)
+	for i := range pos {
+		pos[i] = 1
+	}
+	return []optim.Point{
+		optim.NewPoint(pos, 0),
 	}
 }
 

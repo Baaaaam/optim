@@ -3,6 +3,7 @@ package pswarm_test
 import (
 	"math/rand"
 	"testing"
+	"time"
 
 	"github.com/rwcarlsen/optim"
 	"github.com/rwcarlsen/optim/bench"
@@ -10,8 +11,9 @@ import (
 	"github.com/rwcarlsen/optim/pswarm/population"
 )
 
+const maxiter = 150000
+
 func TestSimple(t *testing.T) {
-	maxiter := 50000
 	for _, fn := range bench.AllFuncs {
 		optimum := fn.Optima()[0].Val
 		it := buildIter(fn)
@@ -40,8 +42,12 @@ func buildIter(fn bench.Func) optim.Iterator {
 		maxv[i] = minv[i] * 1.7
 	}
 
-	rand.Seed(1)
-	pop := population.NewRandom(15*len(low), low, up, minv, maxv)
+	rand.Seed(time.Now().Unix())
+	n := 8 * len(low)
+	if n > maxiter/500 {
+		n = maxiter / 500
+	}
+	pop := population.NewRandom(n, low, up, minv, maxv)
 
 	return pswarm.SimpleIter{
 		Pop:    pop,

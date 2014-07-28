@@ -127,7 +127,7 @@ func buildHybrid(fn bench.Func, cache bool) optim.Iterator {
 
 	s := &pattern.WrapSearcher{Iter: swarmiter}
 	p := &pattern.CompassPoller{
-		Step: (max - min) / 5,
+		Step: (max - min) / 5.7,
 	}
 
 	pos := make([]float64, len(low))
