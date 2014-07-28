@@ -9,6 +9,7 @@ import (
 )
 
 var FoundBetterErr = errors.New("better position discovered")
+var ZeroStepErr = errors.New("poll step size contracted to zero")
 
 type Iterator struct {
 	ev   optim.Evaler
@@ -126,7 +127,7 @@ func (cp *CompassPoller) Poll(obj optim.Objectiver, ev optim.Evaler, from optim.
 func (cp *CompassPoller) Resize(mult float64) error {
 	cp.Step *= mult
 	if cp.Step == 0 {
-		return errors.New("poll step size contracted to zero")
+		return ZeroStepErr
 	}
 	return nil
 }

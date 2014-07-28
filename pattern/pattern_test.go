@@ -111,8 +111,8 @@ func buildHybrid(fn bench.Func, cache bool) optim.Iterator {
 	}
 
 	n := 8 * len(low)
-	if n > 150 {
-		n = 150
+	if n > maxiter/500 {
+		n = maxiter / 500
 	}
 	pop := population.NewRandom(n, low, up, minv, maxv)
 
