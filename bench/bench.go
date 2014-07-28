@@ -25,9 +25,8 @@ var AllFuncs = []Func{
 	HolderTable{},
 	Schaffer2{},
 	Styblinski{NDim: 1},
-	Styblinski{NDim: 2},
-	Styblinski{NDim: 3},
-	Styblinski{NDim: 4},
+	Styblinski{NDim: 10},
+	Styblinski{NDim: 100},
 }
 
 type Func interface {

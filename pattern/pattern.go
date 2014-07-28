@@ -46,7 +46,7 @@ func (it *Iterator) Iterate(o optim.Objectiver, m mesh.Mesh) (best optim.Point, 
 	success, best, np, err := it.p.Poll(obj, it.ev, it.curr)
 	n += np
 	if err != nil {
-		return optim.Point{}, n, err
+		return it.curr, n, err
 	} else if success {
 		it.curr = best
 		return best, n, nil
@@ -122,7 +122,7 @@ func (cp *CompassPoller) Poll(obj optim.Objectiver, ev optim.Evaler, from optim.
 
 	cp.Step *= cp.Contract
 	if cp.Step == 0 {
-		return false, cp.curr, n, errors.New("polling step is contracted to zero")
+		return false, cp.curr, n, errors.New("poll step size contracted to zero")
 	}
 	return false, cp.curr, n, nil
 }
