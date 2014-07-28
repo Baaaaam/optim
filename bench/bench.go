@@ -227,8 +227,8 @@ func (fn Rosenbrock) Bounds() (low, up []float64) {
 	low = make([]float64, fn.NDim)
 	up = make([]float64, fn.NDim)
 	for i := range low {
-		low[i] = -1e5
-		up[i] = 1e5
+		low[i] = -1000
+		up[i] = 1000
 	}
 	return low, up
 }

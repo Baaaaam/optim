@@ -18,11 +18,13 @@ func TestSimple(t *testing.T) {
 		optimum := fn.Optima()[0].Val
 		it := buildIter(fn)
 
-		best, n, _ := bench.Benchmark(it, fn, .01, maxiter)
-		if n < maxiter {
+		best, n, err := bench.Benchmark(it, fn, .01, maxiter)
+		if err != nil {
+			t.Errorf("[FAIL:%v] %v evals: optimum is %v, got %v. %v", fn.Name(), n, optimum, best.Val, err)
+		} else if n < maxiter {
 			t.Logf("[pass:%v] %v evals: optimum is %v, got %v", fn.Name(), n, optimum, best.Val)
 		} else {
-			t.Errorf("[FAIL:%v] optimum is %v, got %v", fn.Name(), optimum, best.Val)
+			t.Errorf("[FAIL:%v] %v evals: optimum is %v, got %v", fn.Name(), n, optimum, best.Val)
 		}
 	}
 }
