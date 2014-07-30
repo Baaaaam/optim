@@ -68,6 +68,7 @@ type CompassPoller struct {
 	Step   float64
 	direcs [][]float64
 	curr   optim.Point
+	m      *mesh.Infinite
 }
 
 func generateDirecs(ndim int) [][]float64 {
@@ -84,10 +85,12 @@ func generateDirecs(ndim int) [][]float64 {
 func (cp *CompassPoller) StepSize() float64 { return cp.Step }
 
 func (cp *CompassPoller) Mesh() mesh.Mesh {
-	return &mesh.Infinite{
-		Origin: cp.curr.Pos(),
-		Step:   cp.Step,
+	if cp.m == nil {
+		cp.m = &mesh.Infinite{}
 	}
+	cp.m.Origin = cp.curr.Pos()
+	cp.m.Step = cp.Step
+	return cp.m
 }
 
 func (cp *CompassPoller) Poll(obj optim.Objectiver, ev optim.Evaler, from optim.Point) (success bool, best optim.Point, neval int, err error) {

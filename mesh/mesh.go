@@ -30,17 +30,11 @@ func (sm *Infinite) Nearest(p []float64) []float64 {
 		panic(fmt.Sprintf("origin len %v incompatible with point len %v", l, len(p)))
 	}
 
-	// set up origin, basis, and inverter if necessary
+	// set up origin and inverter matrix if necessary
 	if len(sm.Origin) == 0 {
 		sm.Origin = make([]float64, len(p))
 	}
-	if sm.Basis == nil {
-		sm.Basis = mat64.NewDense(len(sm.Origin), len(sm.Origin), nil)
-		for i := 0; i < len(sm.Origin); i++ {
-			sm.Basis.Set(i, i, 1)
-		}
-	}
-	if sm.inverter == nil {
+	if sm.Basis != nil && sm.inverter == nil {
 		sm.inverter = mat64.Inverse(sm.Basis)
 	}
 
@@ -50,8 +44,10 @@ func (sm *Infinite) Nearest(p []float64) []float64 {
 		newp[i] = p[i] - sm.Origin[i]
 	}
 	v := mat64.NewDense(len(sm.Origin), 1, newp)
-	rotv := mat64.NewDense(len(sm.Origin), 1, nil)
-	rotv.Mul(sm.inverter, v)
+	rotv := v
+	if sm.inverter != nil {
+		rotv.Mul(sm.inverter, v)
+	}
 
 	// calculate nearest point
 	nearest := mat64.NewDense(len(p), 1, nil)
@@ -64,7 +60,11 @@ func (sm *Infinite) Nearest(p []float64) []float64 {
 	}
 
 	// transform back to standard space
-	rotv.Mul(sm.Basis, nearest)
+	if sm.Basis != nil {
+		rotv.Mul(sm.Basis, nearest)
+	} else {
+		rotv = nearest
+	}
 	return rotv.Col(nil, 0)
 }
 
