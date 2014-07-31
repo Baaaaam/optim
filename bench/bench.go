@@ -28,8 +28,8 @@ var AllFuncs = []Func{
 	Styblinski{NDim: 10},
 	Styblinski{NDim: 100},
 	Rosenbrock{NDim: 2},
-	Rosenbrock{NDim: 10},
-	Rosenbrock{NDim: 100},
+	Rosenbrock{NDim: 3},
+	Rosenbrock{NDim: 7},
 }
 
 type Func interface {

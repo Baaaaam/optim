@@ -113,7 +113,7 @@ func buildHybrid(fn bench.Func, cache bool) optim.Iterator {
 		Vmax:      maxv[0],
 	}
 
-	n := 10 + 7*(len(low)-1)
+	n := 20 + 7*len(low)
 	if n > maxiter/250 {
 		n = maxiter / 250
 	}
@@ -130,7 +130,7 @@ func buildHybrid(fn bench.Func, cache bool) optim.Iterator {
 
 	s := &pattern.WrapSearcher{Iter: swarmiter}
 	p := &pattern.CompassPoller{
-		Step: (max - min) / 5,
+		Step: (max - min) / 7,
 	}
 
 	pos := make([]float64, len(low))
