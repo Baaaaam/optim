@@ -12,10 +12,11 @@ var FoundBetterErr = errors.New("better position discovered")
 var ZeroStepErr = errors.New("poll step size contracted to zero")
 
 type Iterator struct {
-	ev   optim.Evaler
-	p    Poller
-	s    Searcher
-	curr optim.Point
+	ev       optim.Evaler
+	p        Poller
+	s        Searcher
+	curr     optim.Point
+	prevpoll bool
 }
 
 func NewIterator(start optim.Point, e optim.Evaler, p Poller, s Searcher) *Iterator {
@@ -49,10 +50,14 @@ func (it *Iterator) Iterate(o optim.Objectiver, m mesh.Mesh) (best optim.Point, 
 	if err != nil {
 		return it.curr, n, err
 	} else if success {
-		it.p.Resize(2.0)
+		if it.prevpoll {
+			it.p.Resize(2.0)
+		}
+		it.prevpoll = true
 		it.curr = best
 		return best, n, nil
 	} else {
+		it.prevpoll = false
 		err := it.p.Resize(0.5)
 		return it.curr, n, err
 	}

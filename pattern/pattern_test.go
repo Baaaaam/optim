@@ -80,7 +80,7 @@ func buildIter(fn bench.Func) optim.Iterator {
 	return pattern.NewIterator(start, ev, p, s)
 }
 
-func initialpoint(up, low []float64) optim.Point {
+func initialpoint(low, up []float64) optim.Point {
 	max, min := up[0], low[0]
 	pos := make([]float64, len(low))
 	for i := range low {
@@ -100,19 +100,20 @@ func buildHybrid(fn bench.Func, cache bool) optim.Iterator {
 	}
 
 	// configure pswarm solver
-	mv := &pswarm.SimpleMover{
-		Cognition: pswarm.DefaultCognition,
-		Social:    pswarm.DefaultSocial,
-	}
-
 	minv := make([]float64, len(up))
 	maxv := make([]float64, len(up))
 	for i := range up {
-		minv[i] = (up[i] - low[i]) / 6
-		maxv[i] = minv[i] * 1.7
+		minv[i] = (up[i] - low[i]) / 10
+		maxv[i] = minv[i] * 2.0
 	}
 
-	n := 7 * len(low)
+	mv := &pswarm.SimpleMover{
+		Cognition: pswarm.DefaultCognition,
+		Social:    pswarm.DefaultSocial,
+		Vmax:      maxv[0],
+	}
+
+	n := 10 + 7*(len(low)-1)
 	if n > maxiter/250 {
 		n = maxiter / 250
 	}
@@ -129,7 +130,7 @@ func buildHybrid(fn bench.Func, cache bool) optim.Iterator {
 
 	s := &pattern.WrapSearcher{Iter: swarmiter}
 	p := &pattern.CompassPoller{
-		Step: (max - min) / 5.7,
+		Step: (max - min) / 5,
 	}
 
 	pos := make([]float64, len(low))

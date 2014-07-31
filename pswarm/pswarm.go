@@ -1,6 +1,7 @@
 package pswarm
 
 import (
+	"math"
 	"math/rand"
 
 	"github.com/rwcarlsen/optim"
@@ -78,16 +79,25 @@ func (it SimpleIter) Iterate(obj optim.Objectiver, m mesh.Mesh) (best optim.Poin
 }
 
 const (
-	DefaultCognition = 0.4
-	DefaultSocial    = 0.4
+	DefaultCognition = 0.5
+	DefaultSocial    = 0.5
 	DefaultInertia   = 0.9
 )
 
 type SimpleMover struct {
 	Cognition float64
 	Social    float64
+	Vmax      float64
 	InertiaFn func() float64
 	Rng       *rand.Rand
+}
+
+func Speed(vel []float64) float64 {
+	tot := 0.0
+	for _, v := range vel {
+		tot += v * v
+	}
+	return math.Sqrt(tot)
 }
 
 func (mv *SimpleMover) Move(pop Population) {
@@ -111,6 +121,12 @@ func (mv *SimpleMover) Move(pop Population) {
 			p.Vel[i] = mv.InertiaFn()*currv +
 				mv.Cognition*w1*(best.At(i)-p.At(i)) +
 				mv.Social*w2*(best.At(i)-p.At(i))
+			if s := Speed(p.Vel); mv.Vmax > 0 && Speed(p.Vel) > mv.Vmax {
+				for i := range p.Vel {
+					p.Vel[i] *= mv.Vmax / s
+				}
+			}
+
 		}
 
 		// update position
