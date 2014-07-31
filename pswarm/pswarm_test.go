@@ -11,7 +11,7 @@ import (
 	"github.com/rwcarlsen/optim/pswarm/population"
 )
 
-const maxiter = 150000
+const maxiter = 50000
 
 func TestSimple(t *testing.T) {
 	for _, fn := range bench.AllFuncs {

@@ -78,8 +78,8 @@ func (it SimpleIter) Iterate(obj optim.Objectiver, m mesh.Mesh) (best optim.Poin
 }
 
 const (
-	DefaultCognition = 0.5
-	DefaultSocial    = 0.5
+	DefaultCognition = 0.4
+	DefaultSocial    = 0.4
 	DefaultInertia   = 0.9
 )
 

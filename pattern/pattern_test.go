@@ -13,7 +13,7 @@ import (
 	"github.com/rwcarlsen/optim/pswarm/population"
 )
 
-const maxiter = 150000
+const maxiter = 50000
 
 func TestCompass(t *testing.T) {
 	for _, fn := range bench.AllFuncs {
@@ -30,6 +30,8 @@ func TestCompass(t *testing.T) {
 		}
 	}
 }
+
+var seed = time.Now().Unix()
 
 func TestHybridNocache(t *testing.T) {
 	for _, fn := range bench.AllFuncs {
@@ -73,7 +75,7 @@ func buildIter(fn bench.Func) optim.Iterator {
 		Step: (max - min) / 5,
 	}
 
-	rand.Seed(time.Now().Unix())
+	rand.Seed(seed)
 	start := initialpoint(fn.Bounds())
 	return pattern.NewIterator(start, ev, p, s)
 }
@@ -88,7 +90,7 @@ func initialpoint(up, low []float64) optim.Point {
 }
 
 func buildHybrid(fn bench.Func, cache bool) optim.Iterator {
-	rand.Seed(time.Now().Unix())
+	rand.Seed(seed)
 	start := initialpoint(fn.Bounds())
 
 	low, up := fn.Bounds()
@@ -110,9 +112,9 @@ func buildHybrid(fn bench.Func, cache bool) optim.Iterator {
 		maxv[i] = minv[i] * 1.7
 	}
 
-	n := 8 * len(low)
-	if n > maxiter/500 {
-		n = maxiter / 500
+	n := 7 * len(low)
+	if n > maxiter/250 {
+		n = maxiter / 250
 	}
 	pop := population.NewRandom(n, low, up, minv, maxv)
 
