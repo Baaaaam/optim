@@ -36,7 +36,7 @@ var seed = time.Now().Unix()
 func TestHybridNocache(t *testing.T) {
 	for _, fn := range bench.AllFuncs {
 		optimum := fn.Optima()[0].Val
-		it := buildHybrid(fn, false)
+		it := buildHybrid(fn, false, false)
 
 		best, n, err := bench.Benchmark(it, fn, .01, maxiter)
 		if err != nil {
@@ -52,7 +52,23 @@ func TestHybridNocache(t *testing.T) {
 func TestHybridCache(t *testing.T) {
 	for _, fn := range bench.AllFuncs {
 		optimum := fn.Optima()[0].Val
-		it := buildHybrid(fn, true)
+		it := buildHybrid(fn, true, false)
+
+		best, n, err := bench.Benchmark(it, fn, .01, maxiter)
+		if err != nil {
+			t.Errorf("[FAIL:%v] %v evals: optimum is %v, got %v. %v", fn.Name(), n, optimum, best.Val, err)
+		} else if n < maxiter {
+			t.Logf("[pass:%v] %v evals: optimum is %v, got %v", fn.Name(), n, optimum, best.Val)
+		} else {
+			t.Errorf("[FAIL:%v] %v evals: optimum is %v, got %v", fn.Name(), n, optimum, best.Val)
+		}
+	}
+}
+
+func TestHybridCacheParallel(t *testing.T) {
+	for _, fn := range bench.AllFuncs {
+		optimum := fn.Optima()[0].Val
+		it := buildHybrid(fn, true, true)
 
 		best, n, err := bench.Benchmark(it, fn, .01, maxiter)
 		if err != nil {
@@ -89,12 +105,15 @@ func initialpoint(low, up []float64) optim.Point {
 	return optim.NewPoint(pos, math.Inf(1))
 }
 
-func buildHybrid(fn bench.Func, cache bool) optim.Iterator {
+func buildHybrid(fn bench.Func, cache, parallel bool) optim.Iterator {
 	rand.Seed(seed)
 	start := initialpoint(fn.Bounds())
 
 	low, up := fn.Bounds()
 	var ev optim.Evaler = optim.SerialEvaler{}
+	if parallel {
+		ev = optim.ParallelEvaler{}
+	}
 	if cache {
 		ev = optim.NewCacheEvaler(optim.SerialEvaler{})
 	}

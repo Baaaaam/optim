@@ -49,7 +49,8 @@ type Iterator interface {
 type Evaler interface {
 	// Eval evaluates each point using obj and returns the values and number
 	// of function evaluations n.  Unevaluated points should not be returned
-	// in the results slice.
+	// in the results slice.  The order of the points must pre preserved in
+	// the results.
 	Eval(obj Objectiver, points ...Point) (results []Point, n int, err error)
 }
 
@@ -117,6 +118,41 @@ func (ev SerialEvaler) Eval(obj Objectiver, points ...Point) (results []Point, n
 		}
 	}
 	return results, len(results), nil
+}
+
+type ParallelEvaler struct {
+	ContinueOnErr bool
+}
+
+type job struct {
+	Index int
+	P     Point
+	Err   error
+}
+
+func (ev ParallelEvaler) Eval(obj Objectiver, points ...Point) (results []Point, n int, err error) {
+	ch := make(chan job)
+	for i, p := range points {
+		go func(i int, p Point) {
+			var err error
+			p.Val, err = obj.Objective(p.Pos())
+			ch <- job{Index: i, P: p, Err: err}
+		}(i, p)
+	}
+
+	mini := len(points) - 1
+	var minerr error
+	for i := range points {
+		job := <-ch
+		if job.Err != nil && job.Index < mini {
+			minerr = job.Err
+			mini = i
+		}
+		points[job.Index] = job.P
+	}
+	results = points[:mini+1]
+
+	return results, len(points), minerr
 }
 
 type SimpleObjectiver func([]float64) float64

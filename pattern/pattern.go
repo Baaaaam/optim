@@ -91,10 +91,8 @@ func (cp *CompassPoller) StepSize() float64 { return cp.Step }
 
 func (cp *CompassPoller) Mesh() mesh.Mesh {
 	if cp.m == nil {
-		cp.m = &mesh.Infinite{}
+		cp.m = &mesh.Infinite{Origin: cp.curr.Pos(), Step: cp.Step}
 	}
-	cp.m.Origin = cp.curr.Pos()
-	cp.m.Step = cp.Step
 	return cp.m
 }
 
