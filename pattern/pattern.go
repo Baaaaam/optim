@@ -12,19 +12,24 @@ var FoundBetterErr = errors.New("better position discovered")
 var ZeroStepErr = errors.New("poll step size contracted to zero")
 
 type Iterator struct {
-	ev       optim.Evaler
-	p        Poller
-	s        Searcher
-	curr     optim.Point
-	prevpoll bool
+	ev          optim.Evaler
+	p           Poller
+	s           Searcher
+	curr        optim.Point
+	nsuccess    int // number of successive successful polls
+	nfail       int // number of successive failed polls
+	nfailGrow   int // number of successive successful polls before growing mesh
+	nfailShrink int // number of successive failed polls before shrinking mesh
 }
 
 func NewIterator(start optim.Point, e optim.Evaler, p Poller, s Searcher) *Iterator {
 	return &Iterator{
-		curr: start,
-		ev:   e,
-		p:    p,
-		s:    s,
+		curr:        start,
+		ev:          e,
+		p:           p,
+		s:           s,
+		nfailShrink: 1,
+		nfailGrow:   2,
 	}
 }
 
@@ -34,8 +39,10 @@ func (it *Iterator) AddPoint(p optim.Point) {
 	}
 }
 
+// Iterate mutates m and so for each iteration, the same, mutated m should be
+// passed in.
 func (it *Iterator) Iterate(o optim.Objectiver, m mesh.Mesh) (best optim.Point, n int, err error) {
-	success, best, ns, err := it.s.Search(o, it.p.Mesh(), it.curr)
+	success, best, ns, err := it.s.Search(o, m, it.curr)
 	n += ns
 	if err != nil {
 		return best, n, err
@@ -45,35 +52,41 @@ func (it *Iterator) Iterate(o optim.Objectiver, m mesh.Mesh) (best optim.Point, 
 	}
 
 	obj := &ObjStopper{Objectiver: o, Best: it.curr.Val}
-	success, best, np, err := it.p.Poll(obj, it.ev, it.curr)
+	success, best, np, err := it.p.Poll(obj, it.ev, m, it.curr)
 	n += np
 	if err != nil {
 		return it.curr, n, err
 	} else if success {
-		if it.prevpoll {
-			it.p.Resize(2.0)
+		it.nsuccess++
+		it.nfail = 0
+		if it.nsuccess >= it.nfailGrow {
+			m.Resize(2.0)
+			it.nsuccess = 0 // reset after resize
 		}
-		it.prevpoll = true
 		it.curr = best
 		return best, n, nil
 	} else {
-		it.prevpoll = false
-		err := it.p.Resize(0.5)
+		it.nsuccess = 0
+		it.nfail++
+		var err error
+		if it.nfail >= it.nfailShrink {
+			m.Resize(0.5)
+			it.nfail = 0 // reset after resize
+			if m.Step() == 0 {
+				err = ZeroStepErr
+			}
+		}
 		return it.curr, n, err
 	}
 }
 
 type Poller interface {
-	Poll(obj optim.Objectiver, ev optim.Evaler, from optim.Point) (success bool, best optim.Point, neval int, err error)
-	Resize(mult float64) error
-	Mesh() mesh.Mesh
+	Poll(obj optim.Objectiver, ev optim.Evaler, m mesh.Mesh, from optim.Point) (success bool, best optim.Point, neval int, err error)
 }
 
 type CompassPoller struct {
-	Step   float64
 	direcs [][]float64
 	curr   optim.Point
-	m      *mesh.Infinite
 }
 
 func generateDirecs(ndim int) [][]float64 {
@@ -87,18 +100,7 @@ func generateDirecs(ndim int) [][]float64 {
 	return dirs
 }
 
-func (cp *CompassPoller) StepSize() float64 { return cp.Step }
-
-func (cp *CompassPoller) Mesh() mesh.Mesh {
-	if cp.m == nil {
-		cp.m = &mesh.Infinite{}
-	}
-	cp.m.Origin = cp.curr.Pos()
-	cp.m.Step = cp.Step
-	return cp.m
-}
-
-func (cp *CompassPoller) Poll(obj optim.Objectiver, ev optim.Evaler, from optim.Point) (success bool, best optim.Point, neval int, err error) {
+func (cp *CompassPoller) Poll(obj optim.Objectiver, ev optim.Evaler, m mesh.Mesh, from optim.Point) (success bool, best optim.Point, neval int, err error) {
 	if cp.direcs == nil {
 		cp.direcs = generateDirecs(from.Len())
 	}
@@ -108,7 +110,7 @@ func (cp *CompassPoller) Poll(obj optim.Objectiver, ev optim.Evaler, from optim.
 	for _, dir := range cp.direcs {
 		pos := make([]float64, len(dir))
 		for j, v := range dir {
-			pos[j] = from.At(j) + cp.Step*v
+			pos[j] = from.At(j) + m.Step()*v
 		}
 		points = append(points, optim.NewPoint(pos, math.Inf(1)))
 	}
@@ -130,14 +132,6 @@ func (cp *CompassPoller) Poll(obj optim.Objectiver, ev optim.Evaler, from optim.
 	}
 
 	return false, cp.curr, n, nil
-}
-
-func (cp *CompassPoller) Resize(mult float64) error {
-	cp.Step *= mult
-	if cp.Step == 0 {
-		return ZeroStepErr
-	}
-	return nil
 }
 
 type Searcher interface {

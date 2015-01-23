@@ -13,7 +13,7 @@ import (
 	"github.com/rwcarlsen/optim/pswarm/population"
 )
 
-const maxiter = 50000
+const maxiter = 300000
 
 func TestCompass(t *testing.T) {
 	for _, fn := range bench.AllFuncs {
@@ -66,14 +66,9 @@ func TestHybridCache(t *testing.T) {
 }
 
 func buildIter(fn bench.Func) optim.Iterator {
-	low, up := fn.Bounds()
-	max, min := up[0], low[0]
-
 	ev := optim.SerialEvaler{}
 	s := pattern.NullSearcher{}
-	p := &pattern.CompassPoller{
-		Step: (max - min) / 5,
-	}
+	p := &pattern.CompassPoller{}
 
 	rand.Seed(seed)
 	start := initialpoint(fn.Bounds())
@@ -103,8 +98,8 @@ func buildHybrid(fn bench.Func, cache bool) optim.Iterator {
 	minv := make([]float64, len(up))
 	maxv := make([]float64, len(up))
 	for i := range up {
-		minv[i] = (up[i] - low[i]) / 10
-		maxv[i] = minv[i] * 2.0
+		minv[i] = (up[i] - low[i]) / 40
+		maxv[i] = minv[i] * 4
 	}
 
 	mv := &pswarm.SimpleMover{
@@ -113,7 +108,7 @@ func buildHybrid(fn bench.Func, cache bool) optim.Iterator {
 		Vmax:      maxv[0],
 	}
 
-	n := 20 + 7*len(low)
+	n := 10 + 7*len(low)
 	if n > maxiter/250 {
 		n = maxiter / 250
 	}
@@ -129,9 +124,7 @@ func buildHybrid(fn bench.Func, cache bool) optim.Iterator {
 	max, min := up[0], low[0]
 
 	s := &pattern.WrapSearcher{Iter: swarmiter}
-	p := &pattern.CompassPoller{
-		Step: (max - min) / 7,
-	}
+	p := &pattern.CompassPoller{}
 
 	pos := make([]float64, len(low))
 	for i := range low {

@@ -8,6 +8,7 @@ import (
 	"math"
 
 	"github.com/rwcarlsen/optim"
+	"github.com/rwcarlsen/optim/mesh"
 )
 
 var (
@@ -250,9 +251,14 @@ func Benchmark(it optim.Iterator, fn Func, tol float64, maxeval int) (best optim
 	if 0.001 > thresh {
 		thresh = 0.001
 	}
+
+	low, up := fn.Bounds()
+	max, min := up[0], low[0]
+	m := mesh.NewBounded(&mesh.Infinite{StepSize: (max - min) / 5}, low, up)
+
 	for neval < maxeval {
 		var n int
-		best, n, err = it.Iterate(obj, nil)
+		best, n, err = it.Iterate(obj, m)
 		neval += n
 		if err != nil {
 			return best, neval, err

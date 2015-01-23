@@ -15,8 +15,10 @@ func init() {
 // Mesh is an interface for projecting arbitrary dimensional points onto some
 // kind of (potentially discrete) mesh.
 type Mesh interface {
+	Step() float64
 	// Nearest returns the nearest
 	Nearest(p []float64) []float64
+	Resize(mult float64)
 }
 
 // Inifinite is a grid-based, linear-axis mesh that extends in all dimensions
@@ -31,53 +33,59 @@ type Infinite struct {
 	// mesh axis for the car.
 	Basis *mat64.Dense
 	// Step represents the discretization or grid size of the mesh.
-	Step     float64
+	StepSize float64
 	inverter *mat64.Dense
+}
+
+func (m *Infinite) Step() float64 { return m.StepSize }
+
+func (m *Infinite) Resize(mult float64) {
+	m.StepSize *= mult
 }
 
 // Nearest returns the nearest grid point to p by rounding each dimensional
 // position to the nearest grid point.  If the mesh basis is not the identity
 // matrix, then p is transformed to the mesh basis before rounding and then
 // retransformed back.
-func (sm *Infinite) Nearest(p []float64) []float64 {
-	if sm.Step == 0 {
+func (m *Infinite) Nearest(p []float64) []float64 {
+	if m.StepSize == 0 {
 		return append([]float64{}, p...)
-	} else if l := len(sm.Origin); l != 0 && l != len(p) {
+	} else if l := len(m.Origin); l != 0 && l != len(p) {
 		panic(fmt.Sprintf("origin len %v incompatible with point len %v", l, len(p)))
 	}
 
 	// set up origin and inverter matrix if necessary
-	if len(sm.Origin) == 0 {
-		sm.Origin = make([]float64, len(p))
+	if len(m.Origin) == 0 {
+		m.Origin = make([]float64, len(p))
 	}
-	if sm.Basis != nil && sm.inverter == nil {
-		sm.inverter = mat64.Inverse(sm.Basis)
+	if m.Basis != nil && m.inverter == nil {
+		m.inverter = mat64.Inverse(m.Basis)
 	}
 
 	// translate p based on origin and transform to new vector space
 	newp := make([]float64, len(p))
 	for i := range newp {
-		newp[i] = p[i] - sm.Origin[i]
+		newp[i] = p[i] - m.Origin[i]
 	}
-	v := mat64.NewDense(len(sm.Origin), 1, newp)
+	v := mat64.NewDense(len(m.Origin), 1, newp)
 	rotv := v
-	if sm.inverter != nil {
-		rotv.Mul(sm.inverter, v)
+	if m.inverter != nil {
+		rotv.Mul(m.inverter, v)
 	}
 
 	// calculate nearest point
 	nearest := mat64.NewDense(len(p), 1, nil)
-	for i := range sm.Origin {
-		n, rem := math.Modf(rotv.At(i, 0) / sm.Step)
-		if rem/sm.Step > 0.5 {
+	for i := range m.Origin {
+		n, rem := math.Modf(rotv.At(i, 0) / m.StepSize)
+		if rem/m.StepSize > 0.5 {
 			n++
 		}
-		nearest.Set(i, 0, float64(n)*sm.Step)
+		nearest.Set(i, 0, float64(n)*m.StepSize)
 	}
 
 	// transform back to standard space
-	if sm.Basis != nil {
-		rotv.Mul(sm.Basis, nearest)
+	if m.Basis != nil {
+		rotv.Mul(m.Basis, nearest)
 	} else {
 		rotv = nearest
 	}
@@ -87,7 +95,7 @@ func (sm *Infinite) Nearest(p []float64) []float64 {
 type Bounded struct {
 	Lower []float64
 	Upper []float64
-	core  Mesh
+	Mesh
 }
 
 func NewBounded(m Mesh, lower, upper []float64) *Bounded {
@@ -99,7 +107,7 @@ func NewBounded(m Mesh, lower, upper []float64) *Bounded {
 	return &Bounded{
 		Lower: lower,
 		Upper: upper,
-		core:  m,
+		Mesh:  m,
 	}
 }
 
@@ -115,5 +123,5 @@ func (m *Bounded) Nearest(p []float64) []float64 {
 		pdup[i] = math.Max(m.Lower[i], pdup[i])
 		pdup[i] = math.Min(m.Upper[i], pdup[i])
 	}
-	return m.core.Nearest(pdup)
+	return m.Mesh.Nearest(pdup)
 }
