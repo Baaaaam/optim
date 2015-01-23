@@ -18,7 +18,7 @@ type Mesh interface {
 	Step() float64
 	// Nearest returns the nearest
 	Nearest(p []float64) []float64
-	Resize(mult float64)
+	SetStep(step float64)
 }
 
 // Inifinite is a grid-based, linear-axis mesh that extends in all dimensions
@@ -39,9 +39,7 @@ type Infinite struct {
 
 func (m *Infinite) Step() float64 { return m.StepSize }
 
-func (m *Infinite) Resize(mult float64) {
-	m.StepSize *= mult
-}
+func (m *Infinite) SetStep(step float64) { m.StepSize = step }
 
 // Nearest returns the nearest grid point to p by rounding each dimensional
 // position to the nearest grid point.  If the mesh basis is not the identity

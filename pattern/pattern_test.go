@@ -4,7 +4,6 @@ import (
 	"math"
 	"math/rand"
 	"testing"
-	"time"
 
 	"github.com/rwcarlsen/optim"
 	"github.com/rwcarlsen/optim/bench"
@@ -31,7 +30,8 @@ func TestCompass(t *testing.T) {
 	}
 }
 
-var seed = time.Now().Unix()
+//var seed = time.Now().Unix()
+var seed int64 = 1
 
 func TestHybridNocache(t *testing.T) {
 	for _, fn := range bench.AllFuncs {

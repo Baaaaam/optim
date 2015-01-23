@@ -12,14 +12,15 @@ var FoundBetterErr = errors.New("better position discovered")
 var ZeroStepErr = errors.New("poll step size contracted to zero")
 
 type Iterator struct {
-	ev          optim.Evaler
-	p           Poller
-	s           Searcher
-	curr        optim.Point
-	nsuccess    int // number of successive successful polls
-	nfail       int // number of successive failed polls
-	nfailGrow   int // number of successive successful polls before growing mesh
-	nfailShrink int // number of successive failed polls before shrinking mesh
+	ev               optim.Evaler
+	p                Poller
+	s                Searcher
+	curr             optim.Point
+	ContinuousSearch bool // true to not project search points onto poll step size mesh
+	NfailGrow        int  // number of successive successful polls before growing mesh
+	NfailShrink      int  // number of successive failed polls before shrinking mesh
+	nsuccess         int  // (internal) number of successive successful polls
+	nfail            int  // (internal) number of successive failed polls
 }
 
 func NewIterator(start optim.Point, e optim.Evaler, p Poller, s Searcher) *Iterator {
@@ -28,8 +29,8 @@ func NewIterator(start optim.Point, e optim.Evaler, p Poller, s Searcher) *Itera
 		ev:          e,
 		p:           p,
 		s:           s,
-		nfailShrink: 1,
-		nfailGrow:   2,
+		NfailShrink: 1,
+		NfailGrow:   2,
 	}
 }
 
@@ -42,7 +43,13 @@ func (it *Iterator) AddPoint(p optim.Point) {
 // Iterate mutates m and so for each iteration, the same, mutated m should be
 // passed in.
 func (it *Iterator) Iterate(o optim.Objectiver, m mesh.Mesh) (best optim.Point, n int, err error) {
+	prevstep := m.Step()
+	if it.ContinuousSearch {
+		m.SetStep(0)
+	}
 	success, best, ns, err := it.s.Search(o, m, it.curr)
+	m.SetStep(prevstep)
+
 	n += ns
 	if err != nil {
 		return best, n, err
@@ -59,8 +66,8 @@ func (it *Iterator) Iterate(o optim.Objectiver, m mesh.Mesh) (best optim.Point, 
 	} else if success {
 		it.nsuccess++
 		it.nfail = 0
-		if it.nsuccess >= it.nfailGrow {
-			m.Resize(2.0)
+		if it.nsuccess >= it.NfailGrow {
+			m.SetStep(m.Step() * 2.0)
 			it.nsuccess = 0 // reset after resize
 		}
 		it.curr = best
@@ -69,8 +76,8 @@ func (it *Iterator) Iterate(o optim.Objectiver, m mesh.Mesh) (best optim.Point, 
 		it.nsuccess = 0
 		it.nfail++
 		var err error
-		if it.nfail >= it.nfailShrink {
-			m.Resize(0.5)
+		if it.nfail >= it.NfailShrink {
+			m.SetStep(m.Step() * 0.5)
 			it.nfail = 0 // reset after resize
 			if m.Step() == 0 {
 				err = ZeroStepErr
