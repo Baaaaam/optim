@@ -14,6 +14,18 @@ type Point struct {
 	Val float64
 }
 
+func Nearest(p Point, m mesh.Mesh) Point {
+	return NewPoint(m.Nearest(p.pos), p.Val)
+}
+
+func L2Dist(p1, p2 Point) float64 {
+	tot := 0.0
+	for i := 0; i < p1.Len(); i++ {
+		tot += math.Pow(p1.At(i)-p2.At(i), 2)
+	}
+	return math.Sqrt(tot)
+}
+
 func NewPoint(pos []float64, val float64) Point {
 	cpos := make([]float64, len(pos))
 	copy(cpos, pos)

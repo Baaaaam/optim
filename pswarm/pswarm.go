@@ -62,7 +62,7 @@ func (it SimpleIter) Iterate(obj optim.Objectiver, m mesh.Mesh) (best optim.Poin
 	points := it.Pop.Points()
 	if m != nil {
 		for i, p := range points {
-			points[i] = optim.NewPoint(m.Nearest(p.Pos()), p.Val)
+			points[i] = optim.Nearest(p, m)
 		}
 	}
 	results, n, err := it.Evaler.Eval(obj, points...)

@@ -12,7 +12,7 @@ import (
 	"github.com/rwcarlsen/optim/pswarm/population"
 )
 
-const maxiter = 300000
+const maxiter = 100000
 
 func TestCompass(t *testing.T) {
 	for _, fn := range bench.AllFuncs {
@@ -31,7 +31,7 @@ func TestCompass(t *testing.T) {
 }
 
 //var seed = time.Now().Unix()
-var seed int64 = 1
+var seed int64 = 2
 
 func TestHybridNocache(t *testing.T) {
 	for _, fn := range bench.AllFuncs {
@@ -98,7 +98,7 @@ func buildHybrid(fn bench.Func, cache bool) optim.Iterator {
 	minv := make([]float64, len(up))
 	maxv := make([]float64, len(up))
 	for i := range up {
-		minv[i] = (up[i] - low[i]) / 40
+		minv[i] = (up[i] - low[i]) / 20
 		maxv[i] = minv[i] * 4
 	}
 

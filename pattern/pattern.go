@@ -119,7 +119,17 @@ func (cp *CompassPoller) Poll(obj optim.Objectiver, ev optim.Evaler, m mesh.Mesh
 		for j, v := range dir {
 			pos[j] = from.At(j) + m.Step()*v
 		}
-		points = append(points, optim.NewPoint(pos, math.Inf(1)))
+		p := optim.NewPoint(pos, math.Inf(1))
+
+		// It is possible that due to the mesh gridding, the poll point is
+		// outside of constraints or bounds and will be rounded back to the
+		// current point. Check for this and skip the poll point if this is
+		// the case.
+		dist := optim.L2Dist(from, p)
+		eps := 1e-5
+		if dist > eps {
+			points = append(points, optim.Nearest(p, m))
+		}
 	}
 
 	results, n, err := ev.Eval(obj, points...)
