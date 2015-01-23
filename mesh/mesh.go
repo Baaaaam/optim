@@ -12,17 +12,33 @@ func init() {
 	mat64.Register(goblas.Blasser)
 }
 
+// Mesh is an interface for projecting arbitrary dimensional points onto some
+// kind of (potentially discrete) mesh.
 type Mesh interface {
+	// Nearest returns the nearest
 	Nearest(p []float64) []float64
 }
 
+// Inifinite is a grid-based, linear-axis mesh that extends in all dimensions
+// without bounds.  The length of Origin defines the dimensionality of the
+// mesh. If Origin == nil, the dimensionality is set by the first call to
+// Nearest.  If Basis == nil, a unit basis (the identify matrix) is used.  If
+// Step == 0, then the mesh represents continuous space and the Nearest method
+// just returns the point passed to it.
 type Infinite struct {
-	Origin   []float64
-	Basis    *mat64.Dense
+	Origin []float64
+	// Basis contains a set of row vectors defining the directions of each
+	// mesh axis for the car.
+	Basis *mat64.Dense
+	// Step represents the discretization or grid size of the mesh.
 	Step     float64
 	inverter *mat64.Dense
 }
 
+// Nearest returns the nearest grid point to p by rounding each dimensional
+// position to the nearest grid point.  If the mesh basis is not the identity
+// matrix, then p is transformed to the mesh basis before rounding and then
+// retransformed back.
 func (sm *Infinite) Nearest(p []float64) []float64 {
 	if sm.Step == 0 {
 		return append([]float64{}, p...)
@@ -87,6 +103,11 @@ func NewBounded(m Mesh, lower, upper []float64) *Bounded {
 	}
 }
 
+// Nearest returns the nearest bounded grid point to p by sliding each
+// dimensional position to the nearest value inside bounds and then rounding
+// to the nearest grid point.  If the mesh basis is not the identity matrix,
+// then p is transformed to the mesh basis before rounding and then
+// retransformed back.
 func (m *Bounded) Nearest(p []float64) []float64 {
 	pdup := make([]float64, len(p))
 	copy(pdup, p)

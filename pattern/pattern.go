@@ -166,6 +166,9 @@ func (s *WrapSearcher) Search(o optim.Objectiver, m mesh.Mesh, curr optim.Point)
 	return false, curr, n, nil
 }
 
+// ObjStopper is wraps an Objectiver and returns the objective value along
+// with FoundBetterErr as soon as calculates a value better than Best.  This
+// is useful for things like terminating early with opportunistic polling.
 type ObjStopper struct {
 	Best float64
 	optim.Objectiver

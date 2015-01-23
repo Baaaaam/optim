@@ -92,14 +92,6 @@ type SimpleMover struct {
 	Rng       *rand.Rand
 }
 
-func Speed(vel []float64) float64 {
-	tot := 0.0
-	for _, v := range vel {
-		tot += v * v
-	}
-	return math.Sqrt(tot)
-}
-
 func (mv *SimpleMover) Move(pop Population) {
 	if mv.Rng == nil {
 		src := rand.NewSource(1)
@@ -136,4 +128,12 @@ func (mv *SimpleMover) Move(pop Population) {
 		}
 		p.Point = optim.NewPoint(pos, p.Val)
 	}
+}
+
+func Speed(vel []float64) float64 {
+	tot := 0.0
+	for _, v := range vel {
+		tot += v * v
+	}
+	return math.Sqrt(tot)
 }
