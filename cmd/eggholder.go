@@ -58,14 +58,9 @@ func initialpoint(low, up []float64) optim.Point {
 }
 
 func buildIter(fn bench.Func) *pattern.Iterator {
-	low, up := fn.Bounds()
-	max, min := up[0], low[0]
-
 	ev := optim.SerialEvaler{}
 	s := pattern.NullSearcher{}
-	p := &pattern.CompassPoller{
-		Step: (max - min) / 5,
-	}
+	p := &pattern.CompassPoller{}
 
 	start := initialpoint(fn.Bounds())
 	return pattern.NewIterator(start, ev, p, s)

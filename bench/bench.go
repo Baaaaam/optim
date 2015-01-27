@@ -247,7 +247,7 @@ func (fn Rosenbrock) Optima() []optim.Point {
 }
 
 func Benchmark(it optim.Iterator, fn Func, tol float64, maxeval int) (best optim.Point, neval int, err error) {
-	obj := optim.SimpleObjectiver(fn.Eval)
+	obj := optim.Func(fn.Eval)
 	optimum := fn.Optima()[0].Val
 	thresh := tol * abs(optimum)
 	if 0.001 > thresh {

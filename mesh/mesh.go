@@ -4,13 +4,8 @@ import (
 	"fmt"
 	"math"
 
-	"github.com/gonum/blas/goblas"
 	"github.com/gonum/matrix/mat64"
 )
-
-func init() {
-	mat64.Register(goblas.Blasser)
-}
 
 // Mesh is an interface for projecting arbitrary dimensional points onto some
 // kind of (potentially discrete) mesh.
@@ -57,7 +52,11 @@ func (m *Infinite) Nearest(p []float64) []float64 {
 		m.Origin = make([]float64, len(p))
 	}
 	if m.Basis != nil && m.inverter == nil {
-		m.inverter = mat64.Inverse(m.Basis)
+		var err error
+		m.inverter, err = mat64.Inverse(m.Basis)
+		if err != nil {
+			panic("basis inversion failed: " + err.Error())
+		}
 	}
 
 	// translate p based on origin and transform to new vector space
