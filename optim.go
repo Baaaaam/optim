@@ -1,6 +1,7 @@
 package optim
 
 import (
+	"bytes"
 	"crypto/sha1"
 	"encoding/binary"
 	"fmt"
@@ -34,6 +35,16 @@ func (p Point) Pos() []float64 {
 	pos := make([]float64, len(p.pos))
 	copy(pos, p.pos)
 	return pos
+}
+
+func (p Point) String() string {
+	var b bytes.Buffer
+	fmt.Fprintf(&b, "[%.5f", p.pos[0])
+	for _, v := range p.pos[1:] {
+		fmt.Fprintf(&b, " %.5f", v)
+	}
+	b.WriteString("]")
+	return b.String()
 }
 
 func hashPoint(p Point) [sha1.Size]byte {

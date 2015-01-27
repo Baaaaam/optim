@@ -52,7 +52,7 @@ func (p1 item) Less(than llrb.Item) bool {
 func NewConstr(n, maxiter int, lb, ub []float64, low, A, up *mat64.Dense) (points []optim.Point, nbad, iter int) {
 	stackA, b, ranges := optim.StackConstr(low, A, up)
 
-	ndims, _ := up.Dims()
+	_, ndims := A.Dims()
 
 	violaters := llrb.New()
 	points = make([]optim.Point, 0, n)
