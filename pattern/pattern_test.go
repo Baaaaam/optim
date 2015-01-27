@@ -8,11 +8,11 @@ import (
 	"github.com/rwcarlsen/optim"
 	"github.com/rwcarlsen/optim/bench"
 	"github.com/rwcarlsen/optim/pattern"
+	"github.com/rwcarlsen/optim/pop"
 	"github.com/rwcarlsen/optim/pswarm"
-	"github.com/rwcarlsen/optim/pswarm/population"
 )
 
-const maxiter = 100000
+const maxiter = 50000
 
 func TestCompass(t *testing.T) {
 	for _, fn := range bench.AllFuncs {
@@ -66,13 +66,8 @@ func TestHybridCache(t *testing.T) {
 }
 
 func buildIter(fn bench.Func) optim.Iterator {
-	ev := optim.SerialEvaler{}
-	s := pattern.NullSearcher{}
-	p := &pattern.CompassPoller{}
-
-	rand.Seed(seed)
 	start := initialpoint(fn.Bounds())
-	return pattern.NewIterator(start, ev, p, s)
+	return pattern.NewIterator(start, nil, nil, nil)
 }
 
 func initialpoint(low, up []float64) optim.Point {
@@ -94,7 +89,7 @@ func buildHybrid(fn bench.Func, cache bool) optim.Iterator {
 		ev = optim.NewCacheEvaler(optim.SerialEvaler{})
 	}
 
-	// configure pswarm solver
+	// generate initial points
 	minv := make([]float64, len(up))
 	maxv := make([]float64, len(up))
 	for i := range up {
@@ -102,33 +97,14 @@ func buildHybrid(fn bench.Func, cache bool) optim.Iterator {
 		maxv[i] = minv[i] * 4
 	}
 
-	mv := &pswarm.SimpleMover{
-		Cognition: pswarm.DefaultCognition,
-		Social:    pswarm.DefaultSocial,
-		Vmax:      maxv[0],
-	}
-
 	n := 10 + 7*len(low)
-	if n > maxiter/250 {
-		n = maxiter / 250
+	if n > maxiter/1000 {
+		n = maxiter / 1000
 	}
-	pop := population.NewRandom(n, low, up, minv, maxv)
+	points := pop.New(n, low, up)
+	pop := pswarm.NewPopulation(points, minv, maxv)
 
-	swarmiter := pswarm.SimpleIter{
-		Pop:    pop,
-		Evaler: ev,
-		Mover:  mv,
-	}
-
-	// configure pattern solver
-	max, min := up[0], low[0]
-
-	s := &pattern.WrapSearcher{Iter: swarmiter}
-	p := &pattern.CompassPoller{}
-
-	pos := make([]float64, len(low))
-	for i := range low {
-		pos[i] = rand.Float64()*(max-min) + min
-	}
-	return pattern.NewIterator(start, ev, p, s)
+	// configure solver
+	swarmiter := pswarm.NewIterator(pop, ev, nil)
+	return pattern.NewIterator(start, ev, nil, &pattern.WrapSearcher{Iter: swarmiter})
 }

@@ -6,7 +6,6 @@ import (
 
 	"github.com/rwcarlsen/optim"
 	"github.com/rwcarlsen/optim/mesh"
-	"github.com/rwcarlsen/optim/optrand"
 )
 
 type Particle struct {
@@ -29,18 +28,20 @@ type Population []*Particle
 // and generates velocities for each dimension i initialized to uniform random
 // values between minv[i] and maxv[i].  github.com/rwcarlsen/optim.Rand is
 // used for random numbers.
-func NewPopulation(points []optim.Points, minv, maxv []float64) Population {
-	popul := make(Population, len(points))
+func NewPopulation(points []optim.Point, minv, maxv []float64) Population {
+	pop := make(Population, len(points))
 	for i, p := range points {
-		popul[i].Id = i
-		popul[i].Point = p
-		popul[i].Best = optim.NewPoint(p.Pos(), math.Inf(1))
-		popul[i] = make([]float64, len(minv))
-
+		pop[i] = &Particle{
+			Id:    i,
+			Point: p,
+			Best:  optim.NewPoint(p.Pos(), math.Inf(1)),
+			Vel:   make([]float64, len(minv)),
+		}
 		for j := range minv {
-			popul[i].Vel[j] = minv[j] + (maxv[j]-minv[j])*optrand.Float64()
+			pop[i].Vel[j] = minv[j] + (maxv[j]-minv[j])*optim.RandFloat()
 		}
 	}
+	return pop
 }
 
 func (pop Population) Points() []optim.Point {
@@ -65,19 +66,33 @@ type Mover interface {
 	Move(p Population)
 }
 
-type SimpleIter struct {
+type Iterator struct {
 	Pop Population
 	optim.Evaler
 	Mover
 }
 
-func (it SimpleIter) AddPoint(p optim.Point) {
+func NewIterator(pop Population, e optim.Evaler, m Mover) *Iterator {
+	if e == nil {
+		e = optim.SerialEvaler{}
+	}
+	if m == nil {
+		m = &SimpleMover{Cognition: DefaultCognition, Social: DefaultSocial}
+	}
+	return &Iterator{
+		Pop:    pop,
+		Evaler: optim.SerialEvaler{},
+		Mover:  m,
+	}
+}
+
+func (it Iterator) AddPoint(p optim.Point) {
 	if p.Val < it.Pop.Best().Val {
 		it.Pop[0].Best = p
 	}
 }
 
-func (it SimpleIter) Iterate(obj optim.Objectiver, m mesh.Mesh) (best optim.Point, neval int, err error) {
+func (it Iterator) Iterate(obj optim.Objectiver, m mesh.Mesh) (best optim.Point, neval int, err error) {
 	points := it.Pop.Points()
 	if m != nil {
 		for i, p := range points {
@@ -125,6 +140,12 @@ func (mv *SimpleMover) Move(pop Population) {
 	best := pop.Best()
 
 	for _, p := range pop {
+		vmax := mv.Vmax
+		if mv.Vmax == 0 {
+			// if no vmax is given, use 1.5 * current speed
+			vmax = 1.5 * Speed(p.Vel)
+		}
+
 		w1 := mv.Rng.Float64()
 		w2 := mv.Rng.Float64()
 		// update velocity
@@ -134,7 +155,7 @@ func (mv *SimpleMover) Move(pop Population) {
 				mv.Social*w2*(best.At(i)-p.At(i))
 			if s := Speed(p.Vel); mv.Vmax > 0 && Speed(p.Vel) > mv.Vmax {
 				for i := range p.Vel {
-					p.Vel[i] *= mv.Vmax / s
+					p.Vel[i] *= vmax / s
 				}
 			}
 

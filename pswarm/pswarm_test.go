@@ -1,14 +1,12 @@
 package pswarm_test
 
 import (
-	"math/rand"
 	"testing"
-	"time"
 
 	"github.com/rwcarlsen/optim"
 	"github.com/rwcarlsen/optim/bench"
+	"github.com/rwcarlsen/optim/pop"
 	"github.com/rwcarlsen/optim/pswarm"
-	"github.com/rwcarlsen/optim/pswarm/population"
 )
 
 const maxiter = 50000
@@ -30,12 +28,6 @@ func TestSimple(t *testing.T) {
 }
 
 func buildIter(fn bench.Func) optim.Iterator {
-	ev := optim.SerialEvaler{}
-	mv := &pswarm.SimpleMover{
-		Cognition: pswarm.DefaultCognition,
-		Social:    pswarm.DefaultSocial,
-	}
-
 	low, up := fn.Bounds()
 	minv := make([]float64, len(up))
 	maxv := make([]float64, len(up))
@@ -44,16 +36,12 @@ func buildIter(fn bench.Func) optim.Iterator {
 		maxv[i] = minv[i] * 1.7
 	}
 
-	rand.Seed(time.Now().Unix())
-	n := 8 * len(low)
-	if n > maxiter/500 {
-		n = maxiter / 500
+	n := 10 + 7*len(low)
+	if n > maxiter/1000 {
+		n = maxiter / 1000
 	}
-	pop := population.NewRandom(n, low, up, minv, maxv)
+	points := pop.New(n, low, up)
+	pop := pswarm.NewPopulation(points, minv, maxv)
 
-	return pswarm.SimpleIter{
-		Pop:    pop,
-		Evaler: ev,
-		Mover:  mv,
-	}
+	return pswarm.NewIterator(pop, nil, nil)
 }

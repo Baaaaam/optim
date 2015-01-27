@@ -250,8 +250,8 @@ func Benchmark(it optim.Iterator, fn Func, tol float64, maxeval int) (best optim
 	obj := optim.Func(fn.Eval)
 	optimum := fn.Optima()[0].Val
 	thresh := tol * abs(optimum)
-	if 0.001 > thresh {
-		thresh = 0.001
+	if optimum == 0 {
+		thresh = 0.01 * float64(fn.Optima()[0].Len())
 	}
 
 	low, up := fn.Bounds()

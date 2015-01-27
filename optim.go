@@ -69,6 +69,9 @@ type Iterator interface {
 	// function evaluations n and the best point.
 	Iterate(obj Objectiver, m mesh.Mesh) (best Point, n int, err error)
 
+	// AddPoint enables limited hybriding of different optimization iterators
+	// by allowing iterators/solvers to add share information by suggesting
+	// points to each other.
 	AddPoint(p Point)
 }
 

@@ -24,6 +24,15 @@ type Iterator struct {
 }
 
 func NewIterator(start optim.Point, e optim.Evaler, p Poller, s Searcher) *Iterator {
+	if s == nil {
+		s = NullSearcher{}
+	}
+	if p == nil {
+		p = &CompassPoller{}
+	}
+	if e == nil {
+		e = optim.SerialEvaler{}
+	}
 	return &Iterator{
 		curr:        start,
 		ev:          e,
