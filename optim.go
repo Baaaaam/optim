@@ -16,18 +16,6 @@ type Point struct {
 	Val float64
 }
 
-func Nearest(p Point, m mesh.Mesh) Point {
-	return NewPoint(m.Nearest(p.pos), p.Val)
-}
-
-func L2Dist(p1, p2 Point) float64 {
-	tot := 0.0
-	for i := 0; i < p1.Len(); i++ {
-		tot += math.Pow(p1.At(i)-p2.At(i), 2)
-	}
-	return math.Sqrt(tot)
-}
-
 func NewPoint(pos []float64, val float64) Point {
 	cpos := make([]float64, len(pos))
 	copy(cpos, pos)
@@ -37,6 +25,10 @@ func NewPoint(pos []float64, val float64) Point {
 func (p Point) At(i int) float64 { return p.pos[i] }
 
 func (p Point) Len() int { return len(p.pos) }
+
+func (p Point) Matrix() *mat64.Dense {
+	return mat64.NewDense(p.Len(), 1, p.Pos())
+}
 
 func (p Point) Pos() []float64 {
 	pos := make([]float64, len(p.pos))
@@ -203,30 +195,35 @@ type ObjectivePenalty struct {
 	ranges  []float64    // ranges[i] = u[i] - l[i]
 }
 
+func StackConstr(low, A, up *mat64.Dense) (stackA, b *mat64.Dense, ranges []float64) {
+	neglow := &mat64.Dense{}
+	neglow.Scale(-1, low)
+	b = &mat64.Dense{}
+	b.Stack(up, neglow)
+
+	negA := &mat64.Dense{}
+	negA.Scale(-1, A)
+	stackA = &mat64.Dense{}
+	stackA.Stack(A, negA)
+
+	// capture the range of each constraint from A because this information is
+	// lost when converting from "low <= Ax <= up" via stacking to "Ax <= up".
+	m, _ := A.Dims()
+	ranges = make([]float64, m, 2*m)
+	for i := 0; i < m; i++ {
+		ranges[i] = up.At(i, 0) - low.At(i, 0)
+	}
+	ranges = append(ranges, ranges...)
+
+	return stackA, b, ranges
+}
+
 func (o *ObjectivePenalty) init() {
 	if o.a != nil {
 		// already initialized
 		return
 	}
-
-	neglow := &mat64.Dense{}
-	neglow.Scale(-1, o.Low)
-	o.b = &mat64.Dense{}
-	o.b.Stack(o.Up, neglow)
-
-	negA := &mat64.Dense{}
-	negA.Scale(-1, o.A)
-	o.a = &mat64.Dense{}
-	o.a.Stack(o.A, negA)
-
-	// capture the range of each constraint from A because this information is
-	// lost when converting from "low <= Ax <= up" via stacking to "Ax <= up".
-	m, _ := o.A.Dims()
-	o.ranges = make([]float64, m, 2*m)
-	for i := 0; i < m; i++ {
-		o.ranges[i] = o.Up.At(i, 0) - o.Low.At(i, 0)
-	}
-	o.ranges = append(o.ranges, o.ranges...)
+	o.a, o.b, o.ranges = StackConstr(o.Low, o.A, o.Up)
 }
 
 func (o *ObjectivePenalty) Objective(v []float64) (float64, error) {
@@ -252,4 +249,16 @@ func (o *ObjectivePenalty) Objective(v []float64) (float64, error) {
 	}
 
 	return val * (1 + penalty), err
+}
+
+func Nearest(p Point, m mesh.Mesh) Point {
+	return NewPoint(m.Nearest(p.pos), p.Val)
+}
+
+func L2Dist(p1, p2 Point) float64 {
+	tot := 0.0
+	for i := 0; i < p1.Len(); i++ {
+		tot += math.Pow(p1.At(i)-p2.At(i), 2)
+	}
+	return math.Sqrt(tot)
 }

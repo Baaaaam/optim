@@ -156,11 +156,11 @@ func uofy(A, y *mat64.Dense) *mat64.Dense {
 }
 
 // diag returns Y = DIAG(y) for column vector y.
-func diag(y *mat64.Dense) *mat64.Dense {
-	_, n := A.Dims()
+func diag(mat *mat64.Dense) *mat64.Dense {
+	_, n := mat.Dims()
 	Y := mat64.NewDense(n, n, nil)
 	for i := 0; i < n; i++ {
-		Y.Set(i, i, y.At(i, 0))
+		Y.Set(i, i, mat.At(i, 0))
 	}
 	return Y
 }
@@ -173,8 +173,8 @@ func hofy(A, y *mat64.Dense) *mat64.Dense {
 // hofE returns h(E(y)) = {||Ea1||,||Ea2||,...} where ||x|| is euclid norm and a1
 // is row 1 of A as a col vector, a2 is row 2, etc.
 func hofE(A, E *mat64.Dense) *mat64.Dense {
-	m, n := A.Dims()
-	tmpA := mat64.NewDenseCopy(A)
+	m, _ := A.Dims()
+	tmpA := mat64.DenseCopyOf(A)
 	tmpA.TCopy(tmpA)
 	tmpA.Mul(E, tmpA)
 
@@ -192,10 +192,8 @@ func hofE(A, E *mat64.Dense) *mat64.Dense {
 
 // eofy calculates E(y) = transpose(A)*Y*A where Y is DIAG(y).
 func eofy(A, y *mat64.Dense) *mat64.Dense {
-	m, n := A.Dims()
 	Y := diag(y)
-
-	Atrans := mat64.NewDenseCopy(A)
+	Atrans := mat64.DenseCopyOf(A)
 	Atrans.TCopy(Atrans)
 
 	Atrans.Mul(Atrans, Y)
