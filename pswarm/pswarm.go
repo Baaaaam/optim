@@ -6,6 +6,7 @@ import (
 
 	"github.com/rwcarlsen/optim"
 	"github.com/rwcarlsen/optim/mesh"
+	"github.com/rwcarlsen/optim/optrand"
 )
 
 type Particle struct {
@@ -23,6 +24,24 @@ func (p *Particle) Update(newp optim.Point) {
 }
 
 type Population []*Particle
+
+// NewPopulation initializes a population of particles using the given points
+// and generates velocities for each dimension i initialized to uniform random
+// values between minv[i] and maxv[i].  github.com/rwcarlsen/optim.Rand is
+// used for random numbers.
+func NewPopulation(points []optim.Points, minv, maxv []float64) Population {
+	popul := make(Population, len(points))
+	for i, p := range points {
+		popul[i].Id = i
+		popul[i].Point = p
+		popul[i].Best = optim.NewPoint(p.Pos(), math.Inf(1))
+		popul[i] = make([]float64, len(minv))
+
+		for j := range minv {
+			popul[i].Vel[j] = minv[j] + (maxv[j]-minv[j])*optrand.Float64()
+		}
+	}
+}
 
 func (pop Population) Points() []optim.Point {
 	points := make([]optim.Point, 0, len(pop))

@@ -2,19 +2,13 @@ package pop
 
 import (
 	"math"
-	"math/rand"
 
 	"github.com/gonum/matrix/mat64"
 	"github.com/petar/GoLLRB/llrb"
 	"github.com/rwcarlsen/optim"
 )
 
-var Rand Rng = rand.New(rand.NewSource(1))
-
-type Rng interface {
-	Float64() float64
-}
-
+// New uses
 func New(n int, low, up []float64) []optim.Point {
 	if len(low) != len(up) {
 		panic("low and up vectors are not same length")
@@ -26,7 +20,7 @@ func New(n int, low, up []float64) []optim.Point {
 	for i := 0; i < n; i++ {
 		pos := make([]float64, ndims)
 		for j := range pos {
-			pos[j] = low[j] + Rand.Float64()*(up[j]-low[j])
+			pos[j] = low[j] + optim.RandFloat()*(up[j]-low[j])
 		}
 		points[i] = optim.NewPoint(pos, math.Inf(1))
 	}
@@ -48,7 +42,8 @@ func (p1 item) Less(than llrb.Item) bool {
 // and upper box bounds for the variables.  NewConstr generates random points
 // within the box bounds and keeps all feasible points.  It queues up the
 // least unfavorable infeasible points in case n feasible ones cannot be found
-// within maxiter.
+// within maxiter.  github.com/rwcarlsen/optim.Rand is used for random
+// numbers.
 func NewConstr(n, maxiter int, lb, ub []float64, low, A, up *mat64.Dense) (points []optim.Point, nbad, iter int) {
 	stackA, b, ranges := optim.StackConstr(low, A, up)
 
@@ -61,7 +56,7 @@ func NewConstr(n, maxiter int, lb, ub []float64, low, A, up *mat64.Dense) (point
 		pos := make([]float64, ndims)
 		for j := range pos {
 			l, u := lb[j], ub[j]
-			pos[j] = l + Rand.Float64()*(u-l)
+			pos[j] = l + optim.RandFloat()*(u-l)
 		}
 		p := optim.NewPoint(pos, math.Inf(1))
 

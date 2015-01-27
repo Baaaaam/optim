@@ -6,11 +6,20 @@ import (
 	"encoding/binary"
 	"fmt"
 	"math"
+	"math/rand"
 	"sync"
 
 	"github.com/gonum/matrix/mat64"
 	"github.com/rwcarlsen/optim/mesh"
 )
+
+var Rand Rng = rand.New(rand.NewSource(1))
+
+type Rng interface {
+	Float64() float64
+}
+
+func RandFloat() float64 { return Rand.Float64() }
 
 type Point struct {
 	pos []float64
