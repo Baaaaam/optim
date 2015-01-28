@@ -5,6 +5,7 @@ import (
 	"crypto/sha1"
 	"encoding/binary"
 	"fmt"
+	"io"
 	"math"
 	"math/rand"
 	"sync"
@@ -200,25 +201,16 @@ type Func func([]float64) float64
 
 func (so Func) Objective(v []float64) (float64, error) { return so(v), nil }
 
-type ObjectivePrinter struct {
-	Objectiver
-	Count int
+type ObjectiveLogger struct {
+	Obj   Objectiver
+	W     io.Writer
+	count int
 }
 
-func NewObjectivePrinter(obj Objectiver) *ObjectivePrinter {
-	return &ObjectivePrinter{Objectiver: obj}
-}
-
-func (op *ObjectivePrinter) Objective(v []float64) (float64, error) {
-	val, err := op.Objectiver.Objective(v)
-
-	op.Count++
-	fmt.Print(op.Count, " ")
-	for _, x := range v {
-		fmt.Print(x, " ")
-	}
-	fmt.Println("    ", val)
-
+func (l *ObjectiveLogger) Objective(v []float64) (float64, error) {
+	l.count++
+	val, err := l.Obj.Objective(v)
+	fmt.Fprintf(l.W, "%v:  f%v = %v\n", l.count, v, val)
 	return val, err
 }
 
@@ -298,7 +290,11 @@ func StackConstr(low, A, up *mat64.Dense) (stackA, b *mat64.Dense, ranges []floa
 	for i := 0; i < m; i++ {
 		ranges[i] = up.At(i, 0) - low.At(i, 0)
 		if ranges[i] == 0 {
-			ranges[i] = 1
+			if up.At(i, 0) == 0 {
+				ranges[i] = 1
+			} else {
+				ranges[i] = up.At(i, 0)
+			}
 		}
 	}
 	ranges = append(ranges, ranges...)
