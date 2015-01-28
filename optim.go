@@ -205,11 +205,16 @@ type ObjectiveLogger struct {
 	Obj   Objectiver
 	W     io.Writer
 	count int
+	sync.Mutex
 }
 
 func (l *ObjectiveLogger) Objective(v []float64) (float64, error) {
-	l.count++
 	val, err := l.Obj.Objective(v)
+
+	l.Lock()
+	defer l.Unlock()
+
+	l.count++
 	fmt.Fprintf(l.W, "%v:  f%v = %v\n", l.count, v, val)
 	return val, err
 }
