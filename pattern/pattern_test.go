@@ -19,7 +19,7 @@ func TestCompass(t *testing.T) {
 		optimum := fn.Optima()[0].Val
 		it := buildIter(fn)
 
-		best, n, err := bench.Benchmark(it, fn, .01, maxiter)
+		best, niter, n, err := bench.Benchmark(it, fn, .01, maxiter)
 		if err != nil {
 			t.Errorf("[FAIL:%v] %v evals: optimum is %v, got %v. %v", fn.Name(), n, optimum, best.Val, err)
 		} else if n < maxiter {
@@ -38,7 +38,7 @@ func TestHybridNocache(t *testing.T) {
 		optimum := fn.Optima()[0].Val
 		it := buildHybrid(fn, false)
 
-		best, n, err := bench.Benchmark(it, fn, .01, maxiter)
+		best, niter, n, err := bench.Benchmark(it, fn, .01, maxiter)
 		if err != nil {
 			t.Errorf("[FAIL:%v] %v evals: optimum is %v, got %v. %v", fn.Name(), n, optimum, best.Val, err)
 		} else if n < maxiter {
@@ -54,7 +54,7 @@ func TestHybridCache(t *testing.T) {
 		optimum := fn.Optima()[0].Val
 		it := buildHybrid(fn, true)
 
-		best, n, err := bench.Benchmark(it, fn, .01, maxiter)
+		best, niter, n, err := bench.Benchmark(it, fn, .01, maxiter)
 		if err != nil {
 			t.Errorf("[FAIL:%v] %v evals: optimum is %v, got %v. %v", fn.Name(), n, optimum, best.Val, err)
 		} else if n < maxiter {
@@ -102,14 +102,9 @@ func buildHybrid(fn bench.Func, cache bool) optim.Iterator {
 		n = maxiter / 1000
 	}
 	points := pop.New(n, low, up)
-	pop := pswarm.NewPopulation(points, minv, maxv)
 
 	// configure solver
-	mv := &pswarm.Mover{
-		Cognition: pswarm.DefaultCognition,
-		Social:    pswarm.DefaultSocial,
-		Maxiter:   maxiter / n,
-	}
-	swarmiter := pswarm.NewIterator(pop, ev, mv)
-	return pattern.NewIterator(start, ev, nil, &pattern.WrapSearcher{Iter: swarmiter})
+	pop := pswarm.NewPopulation(points, minv, maxv)
+	swarm := pswarm.NewIterator(ev, pop, LinInertia(0.9, 0.4, maxiter/n))
+	return pattern.NewIterator(ev, start, SearchIter(swarm))
 }

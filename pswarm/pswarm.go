@@ -73,18 +73,40 @@ type Iterator struct {
 	*Mover
 }
 
-func NewIterator(pop Population, e optim.Evaler, m *Mover) *Iterator {
+type Option func(*Iterator)
+
+func VelUpdParams(cognition, social float64) Option {
+	return func(it *Iterator) {
+		it.Mover.Cognition = cognition
+		it.Mover.Social = social
+	}
+}
+
+func LinInertia(start, end float64, maxiter int) Option {
+	return func(it *Iterator) {
+		it.Mover.InertiaFn = func(iter int) float64 {
+			return start - (start-end)*float64(iter)/float64(maxiter)
+		}
+	}
+}
+
+func NewIterator(e optim.Evaler, m *Mover, pop Population, opts ...Option) *Iterator {
 	if e == nil {
 		e = optim.SerialEvaler{}
 	}
 	if m == nil {
 		m = &Mover{Cognition: DefaultCognition, Social: DefaultSocial}
 	}
-	return &Iterator{
+	it := &Iterator{
 		Pop:    pop,
 		Evaler: optim.SerialEvaler{},
 		Mover:  m,
 	}
+
+	for _, opt := range opts {
+		opt(it)
+	}
+	return it
 }
 
 func (it Iterator) AddPoint(p optim.Point) {
@@ -117,22 +139,15 @@ type Mover struct {
 	Cognition float64
 	Social    float64
 	Vmax      float64
-	InertiaFn func() float64
-	Maxiter   int
+	InertiaFn func(int) float64
 	iter      int
 }
 
 func (mv *Mover) Move(pop Population) {
 	mv.iter++
 	if mv.InertiaFn == nil {
-		if mv.Maxiter == 0 {
-			mv.InertiaFn = func() float64 {
-				return DefaultInertia
-			}
-		} else {
-			mv.InertiaFn = func() float64 {
-				return 0.9 - (0.5)*float64(mv.iter)/float64(mv.Maxiter)
-			}
+		mv.InertiaFn = func(iter int) float64 {
+			return DefaultInertia
 		}
 	}
 
@@ -149,7 +164,7 @@ func (mv *Mover) Move(pop Population) {
 		w2 := optim.RandFloat()
 		// update velocity
 		for i, currv := range p.Vel {
-			p.Vel[i] = mv.InertiaFn()*currv +
+			p.Vel[i] = mv.InertiaFn(mv.iter)*currv +
 				mv.Cognition*w1*(best.At(i)-p.At(i)) +
 				mv.Social*w2*(best.At(i)-p.At(i))
 			if s := Speed(p.Vel); mv.Vmax > 0 && Speed(p.Vel) > mv.Vmax {

@@ -21,6 +21,19 @@ type Rng interface {
 
 func RandFloat() float64 { return Rand.Float64() }
 
+func Solve(it Iterator, obj Objectiver, m mesh.Mesh, maxiter, maxeval int) (best Point, niter, neval int, err error) {
+	for neval < maxeval && niter < maxiter {
+		var n int
+		best, n, err = it.Iterate(obj, m)
+		neval += n
+		niter++
+		if err != nil {
+			return best, niter, neval, err
+		}
+	}
+	return best, niter, neval, nil
+}
+
 type Point struct {
 	pos []float64
 	Val float64

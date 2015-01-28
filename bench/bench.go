@@ -246,7 +246,7 @@ func (fn Rosenbrock) Optima() []optim.Point {
 	}
 }
 
-func Benchmark(it optim.Iterator, fn Func, tol float64, maxeval int) (best optim.Point, neval int, err error) {
+func Benchmark(it optim.Iterator, fn Func, tol float64, maxeval int) (best optim.Point, niter, neval int, err error) {
 	obj := optim.Func(fn.Eval)
 	optimum := fn.Optima()[0].Val
 	thresh := tol * abs(optimum)
@@ -262,13 +262,14 @@ func Benchmark(it optim.Iterator, fn Func, tol float64, maxeval int) (best optim
 		var n int
 		best, n, err = it.Iterate(obj, m)
 		neval += n
+		niter++
 		if err != nil {
-			return best, neval, err
+			return best, niter, neval, err
 		} else if abs(optimum-best.Val) < thresh {
-			return best, neval, nil
+			return best, niter, neval, nil
 		}
 	}
-	return best, neval, nil
+	return best, niter, neval, nil
 }
 
 func InsideBounds(p []float64, fn Func) bool {

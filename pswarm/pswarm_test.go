@@ -1,12 +1,10 @@
-package pswarm_test
+package pswarm
 
 import (
-	"fmt"
 	"testing"
 
 	"github.com/rwcarlsen/optim/bench"
 	"github.com/rwcarlsen/optim/pop"
-	"github.com/rwcarlsen/optim/pswarm"
 )
 
 const maxiter = 50000
@@ -16,19 +14,19 @@ func TestSimple(t *testing.T) {
 		optimum := fn.Optima()[0].Val
 		it := buildIter(fn)
 
-		best, n, err := bench.Benchmark(it, fn, .01, maxiter)
+		best, niter, neval, err := bench.Benchmark(it, fn, .01, maxiter)
 		if err != nil {
-			t.Errorf("[FAIL:%v] %v evals: optimum is %v, got %v. %v", fn.Name(), n, optimum, best.Val, err)
-		} else if n < maxiter {
-			t.Logf("[pass:%v] %v evals: optimum is %v, got %v", fn.Name(), n, optimum, best.Val)
+			t.Errorf("[FAIL:%v] %v evals: optimum is %v, got %v. %v", fn.Name(), neval, optimum, best.Val, err)
+		} else if neval < maxiter {
+			t.Logf("[pass:%v] %v evals: optimum is %v, got %v", fn.Name(), neval, optimum, best.Val)
 		} else {
-			t.Errorf("[FAIL:%v] %v evals: optimum is %v, got %v", fn.Name(), n, optimum, best.Val)
+			t.Errorf("[FAIL:%v] %v evals: optimum is %v, got %v", fn.Name(), neval, optimum, best.Val)
 		}
-		fmt.Println("final inertia was", it.Mover.InertiaFn())
+		t.Log("final inertia was", it.Mover.InertiaFn(niter))
 	}
 }
 
-func buildIter(fn bench.Func) *pswarm.Iterator {
+func buildIter(fn bench.Func) *Iterator {
 	low, up := fn.Bounds()
 	minv := make([]float64, len(up))
 	maxv := make([]float64, len(up))
@@ -41,13 +39,8 @@ func buildIter(fn bench.Func) *pswarm.Iterator {
 	if n > maxiter/1000 {
 		n = maxiter / 1000
 	}
-	points := pop.New(n, low, up)
-	pop := pswarm.NewPopulation(points, minv, maxv)
 
-	mv := &pswarm.Mover{
-		Cognition: pswarm.DefaultCognition,
-		Social:    pswarm.DefaultSocial,
-		Maxiter:   maxiter / n,
-	}
-	return pswarm.NewIterator(pop, nil, mv)
+	points := pop.New(n, low, up)
+	pop := NewPopulation(points, minv, maxv)
+	return NewIterator(nil, nil, pop, LinInertia(0.9, 0.4, maxiter/n))
 }

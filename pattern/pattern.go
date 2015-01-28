@@ -13,8 +13,8 @@ var ZeroStepErr = errors.New("poll step size contracted to zero")
 
 type Iterator struct {
 	ev               optim.Evaler
-	p                Poller
-	s                Searcher
+	Poller           Poller
+	Searcher         Searcher
 	curr             optim.Point
 	ContinuousSearch bool // true to not project search points onto poll step size mesh
 	NfailGrow        int  // number of successive successful polls before growing mesh
@@ -23,24 +23,47 @@ type Iterator struct {
 	nfail            int  // (internal) number of successive failed polls
 }
 
-func NewIterator(start optim.Point, e optim.Evaler, p Poller, s Searcher) *Iterator {
-	if s == nil {
-		s = NullSearcher{}
+type Option func(*Iterator)
+
+func NfailGrow(n int) Option {
+	return func(it *Iterator) {
+		it.NfailGrow = n
 	}
-	if p == nil {
-		p = &CompassPoller{}
+}
+
+func NfailShrink(n int) Option {
+	return func(it *Iterator) {
+		it.NfailShrink = n
 	}
+}
+
+func SearchIter(it optim.Iterator) Option {
+	return func(iter *Iterator) {
+		iter.Searcher = &WrapSearcher{Iter: it}
+	}
+}
+
+func ContinuousSearch(it *Iterator) {
+	it.ContinuousSearch = true
+}
+
+func NewIterator(e optim.Evaler, start optim.Point, opts ...Option) *Iterator {
 	if e == nil {
 		e = optim.SerialEvaler{}
 	}
-	return &Iterator{
+	it := &Iterator{
 		curr:        start,
 		ev:          e,
-		p:           p,
-		s:           s,
+		Poller:      &CompassPoller{},
+		Searcher:    NullSearcher{},
 		NfailShrink: 1,
 		NfailGrow:   2,
 	}
+
+	for _, opt := range opts {
+		opt(it)
+	}
+	return it
 }
 
 func (it *Iterator) AddPoint(p optim.Point) {
@@ -56,7 +79,7 @@ func (it *Iterator) Iterate(o optim.Objectiver, m mesh.Mesh) (best optim.Point, 
 	if it.ContinuousSearch {
 		m.SetStep(0)
 	}
-	success, best, ns, err := it.s.Search(o, m, it.curr)
+	success, best, ns, err := it.Searcher.Search(o, m, it.curr)
 	m.SetStep(prevstep)
 
 	n += ns
@@ -68,7 +91,7 @@ func (it *Iterator) Iterate(o optim.Objectiver, m mesh.Mesh) (best optim.Point, 
 	}
 
 	obj := &ObjStopper{Objectiver: o, Best: it.curr.Val}
-	success, best, np, err := it.p.Poll(obj, it.ev, m, it.curr)
+	success, best, np, err := it.Poller.Poll(obj, it.ev, m, it.curr)
 	n += np
 	if err != nil {
 		return it.curr, n, err
