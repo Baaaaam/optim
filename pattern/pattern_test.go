@@ -1,4 +1,4 @@
-package pattern_test
+package pattern
 
 import (
 	"math"
@@ -7,7 +7,6 @@ import (
 
 	"github.com/rwcarlsen/optim"
 	"github.com/rwcarlsen/optim/bench"
-	"github.com/rwcarlsen/optim/pattern"
 	"github.com/rwcarlsen/optim/pop"
 	"github.com/rwcarlsen/optim/pswarm"
 )
@@ -19,7 +18,7 @@ func TestCompass(t *testing.T) {
 		optimum := fn.Optima()[0].Val
 		it := buildIter(fn)
 
-		best, niter, n, err := bench.Benchmark(it, fn, .01, maxiter)
+		best, _, n, err := bench.Benchmark(it, fn, .01, maxiter)
 		if err != nil {
 			t.Errorf("[FAIL:%v] %v evals: optimum is %v, got %v. %v", fn.Name(), n, optimum, best.Val, err)
 		} else if n < maxiter {
@@ -38,7 +37,7 @@ func TestHybridNocache(t *testing.T) {
 		optimum := fn.Optima()[0].Val
 		it := buildHybrid(fn, false)
 
-		best, niter, n, err := bench.Benchmark(it, fn, .01, maxiter)
+		best, _, n, err := bench.Benchmark(it, fn, .01, maxiter)
 		if err != nil {
 			t.Errorf("[FAIL:%v] %v evals: optimum is %v, got %v. %v", fn.Name(), n, optimum, best.Val, err)
 		} else if n < maxiter {
@@ -54,7 +53,7 @@ func TestHybridCache(t *testing.T) {
 		optimum := fn.Optima()[0].Val
 		it := buildHybrid(fn, true)
 
-		best, niter, n, err := bench.Benchmark(it, fn, .01, maxiter)
+		best, _, n, err := bench.Benchmark(it, fn, .01, maxiter)
 		if err != nil {
 			t.Errorf("[FAIL:%v] %v evals: optimum is %v, got %v. %v", fn.Name(), n, optimum, best.Val, err)
 		} else if n < maxiter {
@@ -67,7 +66,7 @@ func TestHybridCache(t *testing.T) {
 
 func buildIter(fn bench.Func) optim.Iterator {
 	start := initialpoint(fn.Bounds())
-	return pattern.NewIterator(start, nil, nil, nil)
+	return NewIterator(nil, start)
 }
 
 func initialpoint(low, up []float64) optim.Point {
@@ -86,6 +85,7 @@ func buildHybrid(fn bench.Func, cache bool) optim.Iterator {
 	low, up := fn.Bounds()
 	var ev optim.Evaler = optim.SerialEvaler{}
 	if cache {
+		//ev = optim.NewCacheEvaler(optim.ParallelEvaler{})
 		ev = optim.NewCacheEvaler(optim.SerialEvaler{})
 	}
 
@@ -105,6 +105,6 @@ func buildHybrid(fn bench.Func, cache bool) optim.Iterator {
 
 	// configure solver
 	pop := pswarm.NewPopulation(points, minv, maxv)
-	swarm := pswarm.NewIterator(ev, pop, LinInertia(0.9, 0.4, maxiter/n))
-	return pattern.NewIterator(ev, start, SearchIter(swarm))
+	swarm := pswarm.NewIterator(ev, nil, pop, pswarm.LinInertia(0.9, 0.4, maxiter/n))
+	return NewIterator(ev, start, SearchIter(swarm))
 }

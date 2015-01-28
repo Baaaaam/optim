@@ -26,7 +26,7 @@ func main() {
 		success := false
 		for tot < maxiter {
 			it := buildIter(fn)
-			subbest, n, _ := bench.Benchmark(it, fn, .01, maxiter)
+			subbest, _, n, _ := bench.Benchmark(it, fn, .01, maxiter)
 			tot += n
 			if subbest.Val < best.Val {
 				best = subbest

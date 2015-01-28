@@ -182,13 +182,17 @@ func (ev ParallelEvaler) Eval(obj Objectiver, points ...Point) (results []Point,
 		}()
 	}
 
+	go func() {
+		wg.Wait()
+		close(ch)
+	}()
+
 	for p := range ch {
 		if p.Err != nil {
 			err = p.Err
 		}
 		results = append(results, p.Point)
 	}
-	wg.Wait()
 	return results, len(results), err
 }
 
@@ -293,6 +297,9 @@ func StackConstr(low, A, up *mat64.Dense) (stackA, b *mat64.Dense, ranges []floa
 	ranges = make([]float64, m, 2*m)
 	for i := 0; i < m; i++ {
 		ranges[i] = up.At(i, 0) - low.At(i, 0)
+		if ranges[i] == 0 {
+			ranges[i] = 1
+		}
 	}
 	ranges = append(ranges, ranges...)
 
