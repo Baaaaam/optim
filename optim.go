@@ -61,11 +61,11 @@ func (p Point) Pos() []float64 {
 
 func (p Point) String() string {
 	var b bytes.Buffer
-	fmt.Fprintf(&b, "[%.5f", p.pos[0])
+	fmt.Fprintf(&b, "f[%.5f", p.pos[0])
 	for _, v := range p.pos[1:] {
 		fmt.Fprintf(&b, " %.5f", v)
 	}
-	b.WriteString("]")
+	fmt.Fprintf(&b, "] = %.5f", p.Val)
 	return b.String()
 }
 
@@ -222,36 +222,13 @@ func (op *ObjectivePrinter) Objective(v []float64) (float64, error) {
 // any violated linear constraints. If Weight is zero the underlying
 // objective value will be returned unaltered.
 type ObjectivePenalty struct {
+	Obj     Objectiver
 	A       *mat64.Dense
 	Low, Up *mat64.Dense
-	Obj     Objectiver
 	Weight  float64
 	a       *mat64.Dense // stacked version of A
 	b       *mat64.Dense // Low and Up stacked
 	ranges  []float64    // ranges[i] = u[i] - l[i]
-}
-
-func StackConstr(low, A, up *mat64.Dense) (stackA, b *mat64.Dense, ranges []float64) {
-	neglow := &mat64.Dense{}
-	neglow.Scale(-1, low)
-	b = &mat64.Dense{}
-	b.Stack(up, neglow)
-
-	negA := &mat64.Dense{}
-	negA.Scale(-1, A)
-	stackA = &mat64.Dense{}
-	stackA.Stack(A, negA)
-
-	// capture the range of each constraint from A because this information is
-	// lost when converting from "low <= Ax <= up" via stacking to "Ax <= up".
-	m, _ := A.Dims()
-	ranges = make([]float64, m, 2*m)
-	for i := 0; i < m; i++ {
-		ranges[i] = up.At(i, 0) - low.At(i, 0)
-	}
-	ranges = append(ranges, ranges...)
-
-	return stackA, b, ranges
 }
 
 func (o *ObjectivePenalty) init() {
@@ -297,4 +274,27 @@ func L2Dist(p1, p2 Point) float64 {
 		tot += math.Pow(p1.At(i)-p2.At(i), 2)
 	}
 	return math.Sqrt(tot)
+}
+
+func StackConstr(low, A, up *mat64.Dense) (stackA, b *mat64.Dense, ranges []float64) {
+	neglow := &mat64.Dense{}
+	neglow.Scale(-1, low)
+	b = &mat64.Dense{}
+	b.Stack(up, neglow)
+
+	negA := &mat64.Dense{}
+	negA.Scale(-1, A)
+	stackA = &mat64.Dense{}
+	stackA.Stack(A, negA)
+
+	// capture the range of each constraint from A because this information is
+	// lost when converting from "low <= Ax <= up" via stacking to "Ax <= up".
+	m, _ := A.Dims()
+	ranges = make([]float64, m, 2*m)
+	for i := 0; i < m; i++ {
+		ranges[i] = up.At(i, 0) - low.At(i, 0)
+	}
+	ranges = append(ranges, ranges...)
+
+	return stackA, b, ranges
 }

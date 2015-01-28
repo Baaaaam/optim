@@ -176,11 +176,10 @@ func (cp *CompassPoller) Poll(obj optim.Objectiver, ev optim.Evaler, m mesh.Mesh
 		if cp.curr.Val < from.Val {
 			return true, cp.curr, n, nil
 		}
-	} else if err != nil {
+		return false, cp.curr, n, nil
+	} else {
 		return false, cp.curr, n, err
 	}
-
-	return false, cp.curr, n, nil
 }
 
 type Searcher interface {
