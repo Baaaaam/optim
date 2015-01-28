@@ -16,6 +16,17 @@ type Mesh interface {
 	SetStep(step float64)
 }
 
+type StepLimit struct {
+	Mesh
+	MinStep float64
+}
+
+func (m StepLimit) SetStep(step float64) {
+	if step >= m.MinStep {
+		m.Mesh.SetStep(step)
+	}
+}
+
 // Inifinite is a grid-based, linear-axis mesh that extends in all dimensions
 // without bounds.  The length of Origin defines the dimensionality of the
 // mesh. If Origin == nil, the dimensionality is set by the first call to
