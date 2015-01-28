@@ -1,9 +1,9 @@
 package pswarm_test
 
 import (
+	"fmt"
 	"testing"
 
-	"github.com/rwcarlsen/optim"
 	"github.com/rwcarlsen/optim/bench"
 	"github.com/rwcarlsen/optim/pop"
 	"github.com/rwcarlsen/optim/pswarm"
@@ -24,10 +24,11 @@ func TestSimple(t *testing.T) {
 		} else {
 			t.Errorf("[FAIL:%v] %v evals: optimum is %v, got %v", fn.Name(), n, optimum, best.Val)
 		}
+		fmt.Println("final inertia was", it.Mover.InertiaFn())
 	}
 }
 
-func buildIter(fn bench.Func) optim.Iterator {
+func buildIter(fn bench.Func) *pswarm.Iterator {
 	low, up := fn.Bounds()
 	minv := make([]float64, len(up))
 	maxv := make([]float64, len(up))
@@ -43,5 +44,10 @@ func buildIter(fn bench.Func) optim.Iterator {
 	points := pop.New(n, low, up)
 	pop := pswarm.NewPopulation(points, minv, maxv)
 
-	return pswarm.NewIterator(pop, nil, nil)
+	mv := &pswarm.Mover{
+		Cognition: pswarm.DefaultCognition,
+		Social:    pswarm.DefaultSocial,
+		Maxiter:   maxiter / n,
+	}
+	return pswarm.NewIterator(pop, nil, mv)
 }

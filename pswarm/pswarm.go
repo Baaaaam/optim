@@ -2,10 +2,15 @@ package pswarm
 
 import (
 	"math"
-	"math/rand"
 
 	"github.com/rwcarlsen/optim"
 	"github.com/rwcarlsen/optim/mesh"
+)
+
+const (
+	DefaultCognition = 0.5
+	DefaultSocial    = 0.5
+	DefaultInertia   = 0.9
 )
 
 type Particle struct {
@@ -62,22 +67,18 @@ func (pop Population) Best() optim.Point {
 	return best
 }
 
-type Mover interface {
-	Move(p Population)
-}
-
 type Iterator struct {
 	Pop Population
 	optim.Evaler
-	Mover
+	*Mover
 }
 
-func NewIterator(pop Population, e optim.Evaler, m Mover) *Iterator {
+func NewIterator(pop Population, e optim.Evaler, m *Mover) *Iterator {
 	if e == nil {
 		e = optim.SerialEvaler{}
 	}
 	if m == nil {
-		m = &SimpleMover{Cognition: DefaultCognition, Social: DefaultSocial}
+		m = &Mover{Cognition: DefaultCognition, Social: DefaultSocial}
 	}
 	return &Iterator{
 		Pop:    pop,
@@ -112,28 +113,26 @@ func (it Iterator) Iterate(obj optim.Objectiver, m mesh.Mesh) (best optim.Point,
 	return it.Pop.Best(), n, nil
 }
 
-const (
-	DefaultCognition = 0.5
-	DefaultSocial    = 0.5
-	DefaultInertia   = 0.9
-)
-
-type SimpleMover struct {
+type Mover struct {
 	Cognition float64
 	Social    float64
 	Vmax      float64
 	InertiaFn func() float64
-	Rng       *rand.Rand
+	Maxiter   int
+	iter      int
 }
 
-func (mv *SimpleMover) Move(pop Population) {
-	if mv.Rng == nil {
-		src := rand.NewSource(1)
-		mv.Rng = rand.New(src)
-	}
+func (mv *Mover) Move(pop Population) {
+	mv.iter++
 	if mv.InertiaFn == nil {
-		mv.InertiaFn = func() float64 {
-			return DefaultInertia
+		if mv.Maxiter == 0 {
+			mv.InertiaFn = func() float64 {
+				return DefaultInertia
+			}
+		} else {
+			mv.InertiaFn = func() float64 {
+				return 0.9 - (0.5)*float64(mv.iter)/float64(mv.Maxiter)
+			}
 		}
 	}
 
@@ -146,8 +145,8 @@ func (mv *SimpleMover) Move(pop Population) {
 			vmax = 1.5 * Speed(p.Vel)
 		}
 
-		w1 := mv.Rng.Float64()
-		w2 := mv.Rng.Float64()
+		w1 := optim.RandFloat()
+		w2 := optim.RandFloat()
 		// update velocity
 		for i, currv := range p.Vel {
 			p.Vel[i] = mv.InertiaFn()*currv +

@@ -105,6 +105,11 @@ func buildHybrid(fn bench.Func, cache bool) optim.Iterator {
 	pop := pswarm.NewPopulation(points, minv, maxv)
 
 	// configure solver
-	swarmiter := pswarm.NewIterator(pop, ev, nil)
+	mv := &pswarm.Mover{
+		Cognition: pswarm.DefaultCognition,
+		Social:    pswarm.DefaultSocial,
+		Maxiter:   maxiter / n,
+	}
+	swarmiter := pswarm.NewIterator(pop, ev, mv)
 	return pattern.NewIterator(start, ev, nil, &pattern.WrapSearcher{Iter: swarmiter})
 }
