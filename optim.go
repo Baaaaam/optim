@@ -150,7 +150,7 @@ type SerialEvaler struct {
 
 func (ev SerialEvaler) Eval(obj Objectiver, points ...Point) (results []Point, n int, err error) {
 	results = make([]Point, 0, len(points))
-	for _, p := range points {
+	for _, p := range uniqof(points) {
 		p.Val, err = obj.Objective(p.Pos())
 		results = append(results, p)
 		if err != nil && !ev.ContinueOnErr {
@@ -167,12 +167,27 @@ type errpoint struct {
 
 type ParallelEvaler struct{}
 
+func uniqof(points []Point) []Point {
+	uniq := make([]Point, 0, len(points))
+	alreadyhave := map[[sha1.Size]byte]bool{}
+	for _, p := range points {
+		h := hashPoint(p)
+		if !alreadyhave[h] {
+			alreadyhave[h] = true
+			uniq = append(uniq, p)
+		}
+	}
+	return uniq
+}
+
 func (ev ParallelEvaler) Eval(obj Objectiver, points ...Point) (results []Point, n int, err error) {
 	results = make([]Point, 0, len(points))
-	wg := sync.WaitGroup{}
-	wg.Add(len(points))
 	ch := make(chan errpoint, len(points))
-	for _, p := range points {
+	wg := sync.WaitGroup{}
+	uniq := uniqof(points)
+	wg.Add(len(uniq))
+
+	for _, p := range uniq {
 		go func() {
 			perr := errpoint{Point: p}
 			perr.Val, perr.Err = obj.Objective(p.Pos())
