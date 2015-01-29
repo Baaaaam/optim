@@ -159,10 +159,11 @@ func (cp *CompassPoller) Poll(obj optim.Objectiver, ev optim.Evaler, m mesh.Mesh
 		// outside of constraints or bounds and will be rounded back to the
 		// current point. Check for this and skip the poll point if this is
 		// the case.
-		dist := optim.L2Dist(from, p)
+		nearestp := optim.Nearest(p, m)
+		dist := optim.L2Dist(from, nearestp)
 		eps := 1e-5
 		if dist > eps {
-			points = append(points, optim.Nearest(p, m))
+			points = append(points, nearestp)
 		}
 	}
 
