@@ -92,10 +92,13 @@ func buildHybrid(fn bench.Func, cache bool) optim.Iterator {
 	// generate initial points
 	minv := make([]float64, len(up))
 	maxv := make([]float64, len(up))
+	maxmaxv := 0.0
 	for i := range up {
 		minv[i] = (up[i] - low[i]) / 20
 		maxv[i] = minv[i] * 4
+		maxmaxv += maxv[i] * maxv[i]
 	}
+	maxmaxv = math.Sqrt(maxmaxv)
 
 	n := 10 + 7*len(low)
 	if n > maxiter/1000 {
@@ -105,6 +108,6 @@ func buildHybrid(fn bench.Func, cache bool) optim.Iterator {
 
 	// configure solver
 	pop := pswarm.NewPopulation(points, minv, maxv)
-	swarm := pswarm.NewIterator(ev, nil, pop, pswarm.LinInertia(0.9, 0.4, maxiter/n))
+	swarm := pswarm.NewIterator(ev, nil, pop, pswarm.LinInertia(0.9, 0.4, maxiter/n), pswarm.Vmax(maxmaxv))
 	return NewIterator(ev, start, SearchIter(swarm))
 }
