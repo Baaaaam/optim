@@ -14,17 +14,27 @@ type Mesh interface {
 	// Nearest returns the nearest
 	Nearest(p []float64) []float64
 	SetStep(step float64)
+	SetOrigin(origin []float64)
 }
 
-type StepLimit struct {
+type Integer struct {
 	Mesh
-	MinStep float64
 }
 
-func (m StepLimit) SetStep(step float64) {
-	if step >= m.MinStep {
-		m.Mesh.SetStep(step)
+func (m Integer) Nearest(p []float64) []float64 {
+	gridp := m.Mesh.Nearest(p)
+	for i := range gridp {
+		gridp[i] = math.Floor(gridp[i] + .5) // round to nearest int
 	}
+	return gridp
+}
+
+func (m Integer) SetStep(step float64) {
+	m.Mesh.SetStep(math.Max(step, 1))
+}
+
+func (m Integer) SetOrigin(origin []float64) {
+	m.Mesh.SetOrigin(m.Nearest(origin))
 }
 
 // Inifinite is a grid-based, linear-axis mesh that extends in all dimensions
@@ -46,6 +56,8 @@ type Infinite struct {
 func (m *Infinite) Step() float64 { return m.StepSize }
 
 func (m *Infinite) SetStep(step float64) { m.StepSize = step }
+
+func (m *Infinite) SetOrigin(origin []float64) { m.Origin = origin }
 
 // Nearest returns the nearest grid point to p by rounding each dimensional
 // position to the nearest grid point.  If the mesh basis is not the identity
@@ -93,11 +105,13 @@ func (m *Infinite) Nearest(p []float64) []float64 {
 
 	// transform back to standard space
 	if m.Basis != nil {
-		rotv.Mul(m.Basis, nearest)
-	} else {
-		rotv = nearest
+		nearest.Mul(m.Basis, nearest)
 	}
-	return rotv.Col(nil, 0)
+	nv := nearest.Col(nil, 0)
+	for i := range nv {
+		nv[i] += m.Origin[i]
+	}
+	return nv
 }
 
 type Bounded struct {

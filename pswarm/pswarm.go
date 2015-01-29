@@ -1,6 +1,7 @@
 package pswarm
 
 import (
+	"io"
 	"math"
 
 	"github.com/rwcarlsen/optim"
@@ -67,13 +68,13 @@ func (pop Population) Best() optim.Point {
 	return best
 }
 
-type Iterator struct {
-	Pop Population
-	optim.Evaler
-	*Mover
-}
-
 type Option func(*Iterator)
+
+func Vmax(vel float64) Option {
+	return func(it *Iterator) {
+		it.Mover.Vmax = vel
+	}
+}
 
 func VelUpdParams(cognition, social float64) Option {
 	return func(it *Iterator) {
@@ -88,6 +89,13 @@ func LinInertia(start, end float64, maxiter int) Option {
 			return start - (start-end)*float64(iter)/float64(maxiter)
 		}
 	}
+}
+
+type Iterator struct {
+	Pop Population
+	optim.Evaler
+	*Mover
+	HistLog io.Writer
 }
 
 func NewIterator(e optim.Evaler, m *Mover, pop Population, opts ...Option) *Iterator {

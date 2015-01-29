@@ -1,7 +1,6 @@
 package optim
 
 import (
-	"bytes"
 	"crypto/sha1"
 	"encoding/binary"
 	"fmt"
@@ -61,13 +60,7 @@ func (p Point) Pos() []float64 {
 }
 
 func (p Point) String() string {
-	var b bytes.Buffer
-	fmt.Fprintf(&b, "f[%.5f", p.pos[0])
-	for _, v := range p.pos[1:] {
-		fmt.Fprintf(&b, " %.5f", v)
-	}
-	fmt.Fprintf(&b, "] = %.5f", p.Val)
-	return b.String()
+	return fmt.Sprintf("f%v = %v", p.pos, p.Val)
 }
 
 func hashPoint(p Point) [sha1.Size]byte {
@@ -108,6 +101,9 @@ type Objectiver interface {
 type CacheEvaler struct {
 	ev    Evaler
 	cache map[[sha1.Size]byte]float64
+	// UseCount reports the number of times a cached objective evaluation was
+	// successfully used to avoid recalculation.
+	UseCount int
 }
 
 func NewCacheEvaler(ev Evaler) *CacheEvaler {
@@ -121,8 +117,10 @@ func (ev *CacheEvaler) Eval(obj Objectiver, points ...Point) (results []Point, n
 	fromnew := make([]int, 0, len(points))
 	newp := make([]Point, 0, len(points))
 	for i, p := range points {
-		if val, ok := ev.cache[hashPoint(p)]; ok {
+		h := hashPoint(p)
+		if val, ok := ev.cache[h]; ok {
 			p.Val = val
+			ev.UseCount++
 		} else {
 			fromnew = append(fromnew, i)
 			newp = append(newp, p)

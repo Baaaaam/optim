@@ -87,6 +87,7 @@ func (it *Iterator) Iterate(o optim.Objectiver, m mesh.Mesh) (best optim.Point, 
 		return best, n, err
 	} else if success {
 		it.curr = best
+		m.SetOrigin(best.Pos()) // important to recenter mesh on new best point
 		return best, n, nil
 	}
 
@@ -102,6 +103,7 @@ func (it *Iterator) Iterate(o optim.Objectiver, m mesh.Mesh) (best optim.Point, 
 			m.SetStep(m.Step() * 2.0)
 			it.nsuccess = 0 // reset after resize
 		}
+		m.SetOrigin(best.Pos()) // important to recenter mesh on new best point
 		it.curr = best
 		return best, n, nil
 	} else {
