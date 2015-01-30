@@ -86,6 +86,7 @@ func (it *Iterator) Iterate(o optim.Objectiver, m mesh.Mesh) (best optim.Point, 
 	if err != nil {
 		return best, n, err
 	} else if success {
+		it.nfail = 0
 		it.curr = best
 		m.SetOrigin(best.Pos()) // important to recenter mesh on new best point
 		return best, n, nil
@@ -126,44 +127,24 @@ type Poller interface {
 }
 
 type CompassPoller struct {
-	direcs [][]float64
-	curr   optim.Point
-}
-
-func generateDirecs(ndim int) [][]float64 {
-	dirs := make([][]float64, 2*ndim)
-	for i := 0; i < ndim; i++ {
-		dirs[i] = make([]float64, ndim)
-		dirs[i][i] = 1
-		dirs[ndim+i] = make([]float64, ndim)
-		dirs[ndim+i][i] = -1
-	}
-	return dirs
+	curr optim.Point
 }
 
 func (cp *CompassPoller) Poll(obj optim.Objectiver, ev optim.Evaler, m mesh.Mesh, from optim.Point) (success bool, best optim.Point, neval int, err error) {
-	if cp.direcs == nil {
-		cp.direcs = generateDirecs(from.Len())
-	}
+	pollpoints := genPollPoints(from, m)
+	pollpoints = append(pollpoints, genRandPollPoints(from, m, 2*from.Len())...)
 	cp.curr = from
 
-	points := make([]optim.Point, 0, len(cp.direcs))
-	for _, dir := range cp.direcs {
-		pos := make([]float64, len(dir))
-		for j, v := range dir {
-			pos[j] = from.At(j) + m.Step()*v
-		}
-		p := optim.NewPoint(pos, math.Inf(1))
-
+	points := make([]optim.Point, 0, len(pollpoints))
+	for _, p := range pollpoints {
 		// It is possible that due to the mesh gridding, the poll point is
 		// outside of constraints or bounds and will be rounded back to the
 		// current point. Check for this and skip the poll point if this is
 		// the case.
-		nearestp := optim.Nearest(p, m)
-		dist := optim.L2Dist(from, nearestp)
+		dist := optim.L2Dist(from, p)
 		eps := 1e-5
 		if dist > eps {
-			points = append(points, nearestp)
+			points = append(points, p)
 		}
 	}
 
@@ -227,4 +208,53 @@ func (s *ObjStopper) Objective(v []float64) (float64, error) {
 		return obj, FoundBetterErr
 	}
 	return obj, nil
+}
+
+func genPollPoints(from optim.Point, m mesh.Mesh) []optim.Point {
+	ndim := from.Len()
+	step := m.Step()
+	polls := make([]optim.Point, 0, 2*ndim)
+	for i := 0; i < ndim; i++ {
+		d := from.Pos()
+		d[i] += step
+		polls = append(polls, optim.NewPoint(d, math.Inf(1)))
+
+		d = from.Pos()
+		d[i] += -step
+		polls = append(polls, optim.NewPoint(d, math.Inf(1)))
+	}
+	return gridPoints(m, polls)
+}
+
+// gridPoints returns a new set of points corresponding to the given points
+// moved onto mesh m.
+func gridPoints(m mesh.Mesh, points []optim.Point) []optim.Point {
+	gridded := make([]optim.Point, len(points))
+	for i, p := range points {
+		gridded[i] = optim.Nearest(p, m)
+	}
+	return gridded
+}
+
+func genRandPollPoints(from optim.Point, m mesh.Mesh, n int) []optim.Point {
+	ndim := from.Len()
+	step := m.Step()
+	polls := make([]optim.Point, 0, n)
+	for len(polls) < n {
+		d1 := from.Pos()
+		d2 := from.Pos()
+
+		hasnonzero := false
+		for i := 0; i < ndim; i++ {
+			r := optim.Rand.Intn(3) - 1 // r in {-1,0,1}
+			d1[i] += step * float64(r)
+			d2[i] += -step * float64(r)
+			hasnonzero = hasnonzero || (r != 0)
+		}
+		if hasnonzero {
+			polls = append(polls, optim.NewPoint(d1, math.Inf(1)))
+			polls = append(polls, optim.NewPoint(d2, math.Inf(1)))
+		}
+	}
+	return gridPoints(m, polls)
 }

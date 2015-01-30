@@ -17,6 +17,7 @@ var Rand Rng = rand.New(rand.NewSource(1))
 
 type Rng interface {
 	Float64() float64
+	Intn(n int) int
 }
 
 func RandFloat() float64 { return Rand.Float64() }
