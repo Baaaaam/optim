@@ -99,7 +99,7 @@ func (it *Iterator) Iterate(o optim.Objectiver, m mesh.Mesh) (best optim.Point, 
 	} else if success {
 		it.nsuccess++
 		it.nfail = 0
-		if it.nsuccess >= it.NfailGrow {
+		if it.nsuccess == it.NfailGrow { // == allows -1 to mean never grow
 			m.SetStep(m.Step() * 2.0)
 			it.nsuccess = 0 // reset after resize
 		}
@@ -110,7 +110,7 @@ func (it *Iterator) Iterate(o optim.Objectiver, m mesh.Mesh) (best optim.Point, 
 		it.nsuccess = 0
 		it.nfail++
 		var err error
-		if it.nfail >= it.NfailShrink {
+		if it.nfail == it.NfailShrink { // == allows -1 to mean never shrink
 			m.SetStep(m.Step() * 0.5)
 			it.nfail = 0 // reset after resize
 			if m.Step() == 0 {
