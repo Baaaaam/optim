@@ -1,7 +1,8 @@
 package pswarm
 
 import (
-	"io"
+	"database/sql"
+	"fmt"
 	"math"
 
 	"github.com/rwcarlsen/optim"
@@ -76,6 +77,12 @@ func Vmax(vel float64) Option {
 	}
 }
 
+func DB(db *sql.DB) Option {
+	return func(it *Iterator) {
+		it.Db = db
+	}
+}
+
 func VelUpdParams(cognition, social float64) Option {
 	return func(it *Iterator) {
 		it.Mover.Cognition = cognition
@@ -95,7 +102,8 @@ type Iterator struct {
 	Pop Population
 	optim.Evaler
 	*Mover
-	HistLog io.Writer
+	Db    *sql.DB
+	count int
 }
 
 func NewIterator(e optim.Evaler, m *Mover, pop Population, opts ...Option) *Iterator {
@@ -114,6 +122,8 @@ func NewIterator(e optim.Evaler, m *Mover, pop Population, opts ...Option) *Iter
 	for _, opt := range opts {
 		opt(it)
 	}
+
+	it.initdb()
 	return it
 }
 
@@ -124,6 +134,7 @@ func (it Iterator) AddPoint(p optim.Point) {
 }
 
 func (it Iterator) Iterate(obj optim.Objectiver, m mesh.Mesh) (best optim.Point, neval int, err error) {
+	it.count++
 	points := it.Pop.Points()
 	if m != nil {
 		for i, p := range points {
@@ -139,8 +150,95 @@ func (it Iterator) Iterate(obj optim.Objectiver, m mesh.Mesh) (best optim.Point,
 		it.Pop[i].Update(results[i])
 	}
 
+	it.updateDb()
+
 	it.Mover.Move(it.Pop)
 	return it.Pop.Best(), n, nil
+}
+
+func (it *Iterator) initdb() {
+	if it.Db == nil {
+		return
+	}
+
+	tx, err := it.Db.Begin()
+	panicif(err)
+	defer tx.Commit()
+
+	s := "CREATE TABLE IF NOT EXISTS particles (id INTEGER, iter INTEGER, val REAL"
+	s += it.xdbsql("define")
+	s += ");"
+
+	_, err = tx.Exec(s)
+	panicif(err)
+
+	s = "CREATE TABLE IF NOT EXISTS best (id INTEGER,iter INTEGER, val REAL"
+	s += it.xdbsql("define")
+	s += ");"
+	_, err = tx.Exec(s)
+	panicif(err)
+
+	s = "CREATE TABLE IF NOT EXISTS globalbest (iter INTEGER, val REAL"
+	s += it.xdbsql("define")
+	s += ");"
+	_, err = tx.Exec(s)
+	panicif(err)
+}
+
+func (it Iterator) xdbsql(op string) string {
+	s := ""
+	for i := range it.Pop[0].Pos() {
+		if op == "?" {
+			s += ",?"
+		} else if op == "define" {
+			s += fmt.Sprintf(",x%v REAL", i)
+		} else if op == "x" {
+			s += fmt.Sprintf(",x%v", i)
+		} else {
+			panic("invalid db op " + op)
+		}
+	}
+	return s
+}
+
+func pos2iface(pos []float64) []interface{} {
+	iface := []interface{}{}
+	for _, v := range pos {
+		iface = append(iface, v)
+	}
+	return iface
+}
+
+func (it Iterator) updateDb() {
+	if it.Db == nil {
+		return
+	}
+
+	tx, err := it.Db.Begin()
+	if err != nil {
+		panic(err.Error())
+	}
+	defer tx.Commit()
+
+	s1 := "INSERT INTO particles (id,iter,val" + it.xdbsql("x") + ") VALUES (?,?,?" + it.xdbsql("?") + ");"
+	s2 := "INSERT INTO best (id,iter,val" + it.xdbsql("x") + ") VALUES (?,?,?" + it.xdbsql("?") + ");"
+	s3 := "INSERT INTO globalbest (iter,val" + it.xdbsql("x") + ") VALUES (?,?" + it.xdbsql("?") + ");"
+	for _, p := range it.Pop {
+		args := []interface{}{p.Id, it.count, p.Val}
+		args = append(args, pos2iface(p.Pos())...)
+		_, err := tx.Exec(s1, args...)
+		panicif(err)
+		args = []interface{}{p.Id, it.count, p.Val}
+		args = append(args, pos2iface(p.Best.Pos())...)
+		_, err = tx.Exec(s2, args...)
+		panicif(err)
+	}
+
+	glob := it.Pop.Best()
+	args := []interface{}{it.count, glob.Val}
+	args = append(args, pos2iface(glob.Pos())...)
+	_, err = tx.Exec(s3, args...)
+	panicif(err)
 }
 
 type Mover struct {
@@ -198,4 +296,10 @@ func Speed(vel []float64) float64 {
 		tot += v * v
 	}
 	return math.Sqrt(tot)
+}
+
+func panicif(err error) {
+	if err != nil {
+		panic(err.Error())
+	}
 }
