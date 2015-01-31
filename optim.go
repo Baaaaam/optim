@@ -254,20 +254,14 @@ type Func func([]float64) float64
 func (so Func) Objective(v []float64) (float64, error) { return so(v), nil }
 
 type ObjectiveLogger struct {
-	Obj   Objectiver
-	W     io.Writer
-	count int
-	sync.Mutex
+	Obj Objectiver
+	W   io.Writer
 }
 
 func (l *ObjectiveLogger) Objective(v []float64) (float64, error) {
 	val, err := l.Obj.Objective(v)
 
-	l.Lock()
-	defer l.Unlock()
-
-	l.count++
-	fmt.Fprintf(l.W, "%v:  f%v = %v\n", l.count, v, val)
+	fmt.Fprintf(l.W, "f%v = %v\n", v, val)
 	return val, err
 }
 
