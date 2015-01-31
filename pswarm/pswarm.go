@@ -115,7 +115,7 @@ func NewIterator(e optim.Evaler, m *Mover, pop Population, opts ...Option) *Iter
 	}
 	it := &Iterator{
 		Pop:    pop,
-		Evaler: optim.SerialEvaler{},
+		Evaler: e,
 		Mover:  m,
 	}
 
