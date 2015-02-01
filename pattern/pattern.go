@@ -54,7 +54,7 @@ func NewIterator(e optim.Evaler, start optim.Point, opts ...Option) *Iterator {
 	it := &Iterator{
 		curr:        start,
 		ev:          e,
-		Poller:      &CompassPoller{},
+		Poller:      &CompassPoller{Nrandom: start.Len() * 2, Nkeep: start.Len()},
 		Searcher:    NullSearcher{},
 		NfailShrink: 1,
 		NfailGrow:   2,
@@ -92,8 +92,7 @@ func (it *Iterator) Iterate(o optim.Objectiver, m mesh.Mesh) (best optim.Point, 
 		return best, n, nil
 	}
 
-	obj := &ObjStopper{Objectiver: o, Best: it.curr.Val}
-	success, best, np, err := it.Poller.Poll(obj, it.ev, m, it.curr)
+	success, best, np, err := it.Poller.Poll(o, it.ev, m, it.curr)
 	n += np
 	if err != nil {
 		return it.curr, n, err
@@ -127,13 +126,34 @@ type Poller interface {
 }
 
 type CompassPoller struct {
-	curr optim.Point
+	// Nrandom specifies the number of random-direction chosen points to
+	// include in addition to the compass direction points on each poll.
+	Nrandom int
+	// Nkeep specifies the number of previous successful poll directions to
+	// reuse on the next poll. The number of reused directions is min(Nkeep,
+	// nsuccessful).
+	Nkeep int
+	keepdirecs [][]int
+}
+
+func direcbetween(from, to optim.Point, m mesh.Mesh) []int {
+	d := make([]int, from.Len())
+	step := m.Step()
+	for i := 0; i < from.Len(); i++ {
+		d[i] = int((to.At(i) - from.At(i)) / step)
+	}
+	return d
 }
 
 func (cp *CompassPoller) Poll(obj optim.Objectiver, ev optim.Evaler, m mesh.Mesh, from optim.Point) (success bool, best optim.Point, neval int, err error) {
+	best = from
+
 	pollpoints := genPollPoints(from, m)
-	pollpoints = append(pollpoints, genRandPollPoints(from, m, 2*from.Len())...)
-	cp.curr = from
+	pollpoints = append(pollpoints, genRandPollPoints(from, m, cp.Nrandom)...)
+	for _, dir := range cp.keepdirecs {
+		pollpoints = append(pollpoints, pointFromDirec(from, dir, m))
+	}
+	cp.keepdirecs = nil
 
 	points := make([]optim.Point, 0, len(pollpoints))
 	for _, p := range pollpoints {
@@ -142,27 +162,32 @@ func (cp *CompassPoller) Poll(obj optim.Objectiver, ev optim.Evaler, m mesh.Mesh
 		// current point. Check for this and skip the poll point if this is
 		// the case.
 		dist := optim.L2Dist(from, p)
-		eps := 1e-5
+		eps := 1e-10
 		if dist > eps {
 			points = append(points, p)
 		}
 	}
 
-	results, n, err := ev.Eval(obj, points...)
+	objstop := &ObjStopper{Objectiver: obj, Best: from.Val}
+	results, n, err := ev.Eval(objstop, points...)
+	if err != nil && err != FoundBetterErr {
+		return false, best, n, err
+	}
 
-	if err == nil || err == FoundBetterErr {
-		err = nil
-		for i := range results {
-			if results[i].Val < cp.curr.Val {
-				cp.curr = results[i]
-			}
+	for _, p := range results {
+		if p.Val < best.Val {
+			cp.keepdirecs = append(cp.keepdirecs, direcbetween(from, p, m))
+			best = p
 		}
-		if cp.curr.Val < from.Val {
-			return true, cp.curr, n, nil
-		}
-		return false, cp.curr, n, nil
+	}
+	if len(cp.keepdirecs) > cp.Nkeep {
+		cp.keepdirecs = cp.keepdirecs[:cp.Nkeep]
+	}
+
+	if best.Val < from.Val {
+		return true, best, n, nil
 	} else {
-		return false, cp.curr, n, err
+		return false, from, n, nil
 	}
 }
 
@@ -212,49 +237,47 @@ func (s *ObjStopper) Objective(v []float64) (float64, error) {
 
 func genPollPoints(from optim.Point, m mesh.Mesh) []optim.Point {
 	ndim := from.Len()
-	step := m.Step()
 	polls := make([]optim.Point, 0, 2*ndim)
 	for i := 0; i < ndim; i++ {
-		d := from.Pos()
-		d[i] += step
-		polls = append(polls, optim.NewPoint(d, math.Inf(1)))
+		d := make([]int, ndim)
+		d[i] = 1
+		polls = append(polls, pointFromDirec(from, d, m))
 
-		d = from.Pos()
-		d[i] += -step
-		polls = append(polls, optim.NewPoint(d, math.Inf(1)))
+		d = make([]int, ndim)
+		d[i] = -1
+		polls = append(polls, pointFromDirec(from, d, m))
 	}
-	return gridPoints(m, polls)
+	return polls
 }
 
-// gridPoints returns a new set of points corresponding to the given points
-// moved onto mesh m.
-func gridPoints(m mesh.Mesh, points []optim.Point) []optim.Point {
-	gridded := make([]optim.Point, len(points))
-	for i, p := range points {
-		gridded[i] = optim.Nearest(p, m)
+func pointFromDirec(from optim.Point, direc []int, m mesh.Mesh) optim.Point {
+	pos := make([]float64, from.Len())
+	for i := range pos {
+		pos[i] = from.At(i) + float64(direc[i]) * m.Step()
+
 	}
-	return gridded
+	p := optim.NewPoint(pos, math.Inf(1))
+	return optim.Nearest(p, m)
 }
 
 func genRandPollPoints(from optim.Point, m mesh.Mesh, n int) []optim.Point {
 	ndim := from.Len()
-	step := m.Step()
 	polls := make([]optim.Point, 0, n)
 	for len(polls) < n {
-		d1 := from.Pos()
-		d2 := from.Pos()
+		d1 := make([]int, ndim)
+		d2 := make([]int, ndim)
 
 		hasnonzero := false
 		for i := 0; i < ndim; i++ {
 			r := optim.Rand.Intn(3) - 1 // r in {-1,0,1}
-			d1[i] += step * float64(r)
-			d2[i] += -step * float64(r)
+			d1[i] += r
+			d2[i] += -r
 			hasnonzero = hasnonzero || (r != 0)
 		}
 		if hasnonzero {
-			polls = append(polls, optim.NewPoint(d1, math.Inf(1)))
-			polls = append(polls, optim.NewPoint(d2, math.Inf(1)))
+			polls = append(polls, pointFromDirec(from, d1, m))
+			polls = append(polls, pointFromDirec(from, d2, m))
 		}
 	}
-	return gridPoints(m, polls)
+	return polls
 }
