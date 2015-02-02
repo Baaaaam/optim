@@ -64,11 +64,11 @@ func (pop Population) Points() []optim.Point {
 	return points
 }
 
-func (pop Population) Best() optim.Point {
-	best := pop[0].Best
+func (pop Population) Best() *Particle {
+	best := pop[0]
 	for _, p := range pop[1:] {
-		if p.Best.Val < best.Val {
-			best = p.Best
+		if p.Val < best.Val {
+			best = p
 		}
 	}
 	return best
@@ -88,6 +88,12 @@ func DB(db *sql.DB) Option {
 	}
 }
 
+func KillDist(dist float64) Option {
+	return func(it *Iterator) {
+		it.KillDist = dist
+	}
+}
+
 func VelUpdParams(cognition, social float64) Option {
 	return func(it *Iterator) {
 		it.Mover.Cognition = cognition
@@ -104,11 +110,16 @@ func LinInertia(start, end float64, maxiter int) Option {
 }
 
 type Iterator struct {
-	Pop Population
+	// KillDist is the distance from the global optimum below which particles
+	// are killed.  Zero for never killing particles.  Large values result in
+	// a particle being killed whenever it becomes the global optimum.
+	KillDist float64
+	Pop      Population
 	optim.Evaler
 	*Mover
 	Db    *sql.DB
 	count int
+	best  optim.Point
 }
 
 func NewIterator(e optim.Evaler, m *Mover, pop Population, opts ...Option) *Iterator {
@@ -119,9 +130,11 @@ func NewIterator(e optim.Evaler, m *Mover, pop Population, opts ...Option) *Iter
 		m = &Mover{Cognition: DefaultCognition, Social: DefaultSocial}
 	}
 	it := &Iterator{
-		Pop:    pop,
-		Evaler: e,
-		Mover:  m,
+		Pop:      pop,
+		Evaler:   e,
+		Mover:    m,
+		best:     pop.Best().Point,
+		KillDist: math.Inf(1),
 	}
 
 	for _, opt := range opts {
@@ -133,8 +146,8 @@ func NewIterator(e optim.Evaler, m *Mover, pop Population, opts ...Option) *Iter
 }
 
 func (it Iterator) AddPoint(p optim.Point) {
-	if p.Val < it.Pop.Best().Val {
-		it.Pop[0].Best = p
+	if p.Val < it.best.Val {
+		it.best = p
 	}
 }
 
@@ -156,9 +169,23 @@ func (it Iterator) Iterate(obj optim.Objectiver, m mesh.Mesh) (best optim.Point,
 	}
 
 	it.updateDb()
+	it.Mover.Move(it.best, it.Pop)
 
-	it.Mover.Move(it.Pop)
-	return it.Pop.Best(), n, nil
+	pbest := it.Pop.Best()
+	if pbest.Val < it.best.Val {
+		it.best = pbest.Best
+		// only kill if moving particles found a new best
+		if it.KillDist > 0 && optim.L2Dist(pbest.Point, it.best) < it.KillDist {
+			for i, p := range it.Pop {
+				if p.Id == pbest.Id {
+					it.Pop = append(it.Pop[:i], it.Pop[i+1:]...)
+					break
+				}
+			}
+		}
+	}
+
+	return it.best, n, nil
 }
 
 func (it *Iterator) initdb() {
@@ -224,7 +251,7 @@ func (it Iterator) updateDb() {
 		panicif(err)
 	}
 
-	glob := it.Pop.Best()
+	glob := it.best
 	args := []interface{}{it.count, glob.Val}
 	args = append(args, pos2iface(glob.Pos())...)
 	_, err = tx.Exec(s2, args...)
@@ -239,15 +266,13 @@ type Mover struct {
 	iter      int
 }
 
-func (mv *Mover) Move(pop Population) {
+func (mv *Mover) Move(best optim.Point, pop Population) {
 	mv.iter++
 	if mv.InertiaFn == nil {
 		mv.InertiaFn = func(iter int) float64 {
 			return DefaultInertia
 		}
 	}
-
-	best := pop.Best()
 
 	for _, p := range pop {
 		vmax := mv.Vmax

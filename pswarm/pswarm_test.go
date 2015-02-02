@@ -47,7 +47,7 @@ func TestSimple(t *testing.T) {
 		optimum := fn.Optima()[0].Val
 		it := buildIter(fn, nil)
 
-		best, niter, neval, err := bench.Benchmark(it, fn, .01, maxeval)
+		best, _, neval, err := bench.Benchmark(it, fn, .01, maxeval)
 		if err != nil {
 			t.Errorf("[FAIL:%v] %v evals: optimum is %v, got %v. %v", fn.Name(), neval, optimum, best.Val, err)
 		} else if neval < maxeval {

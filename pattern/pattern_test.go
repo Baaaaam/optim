@@ -133,9 +133,9 @@ func buildHybrid(fn bench.Func, cache bool) optim.Iterator {
 	}
 	maxmaxv = math.Sqrt(maxmaxv)
 
-	n := 10 + 7*len(low)
-	if n > maxeval/1000 {
-		n = maxeval / 1000
+	n := 10 + 10*len(low)
+	if n > maxeval/100 {
+		n = maxeval / 100
 	}
 	points := pop.New(n, low, up)
 

@@ -69,7 +69,7 @@ func NewIterator(e optim.Evaler, start optim.Point, opts ...Option) *Iterator {
 	it := &Iterator{
 		curr:        start,
 		ev:          e,
-		Poller:      &CompassPoller{Nrandom: start.Len() * 2, Nkeep: start.Len()},
+		Poller:      &CompassPoller{Nrandom: start.Len() * 4, Nkeep: start.Len()},
 		Searcher:    NullSearcher{},
 		NfailShrink: 1,
 		NfailGrow:   2,
@@ -355,6 +355,7 @@ func pointFromDirec(from optim.Point, direc []int, m mesh.Mesh) optim.Point {
 }
 
 func genRandPollPoints(from optim.Point, m mesh.Mesh, n int) []optim.Point {
+	rmax := 6
 	ndim := from.Len()
 	polls := make([]optim.Point, 0, n)
 	for len(polls) < n {
@@ -363,10 +364,17 @@ func genRandPollPoints(from optim.Point, m mesh.Mesh, n int) []optim.Point {
 
 		hasnonzero := false
 		for i := 0; i < ndim; i++ {
-			r := optim.Rand.Intn(3) - 1 // r in {-1,0,1}
-			d1[i] += r
-			d2[i] += -r
-			hasnonzero = hasnonzero || (r != 0)
+			r := optim.Rand.Intn(rmax)
+			v := 0
+			if r == 0 { // prob = 1/rmax
+				v = 1
+			} else if r == 1 { // prob = 1/rmax
+				v = -1
+			}
+
+			d1[i] += v
+			d2[i] += -v
+			hasnonzero = hasnonzero || (v != 0)
 		}
 		if hasnonzero {
 			polls = append(polls, pointFromDirec(from, d1, m))
