@@ -15,6 +15,11 @@ const (
 	DefaultInertia   = 0.9
 )
 
+const (
+	TblParticles = "swarmparticles"
+	TblBest      = "swarmbest"
+)
+
 type Particle struct {
 	Id int
 	optim.Point
@@ -161,27 +166,17 @@ func (it *Iterator) initdb() {
 		return
 	}
 
-	tx, err := it.Db.Begin()
-	panicif(err)
-	defer tx.Commit()
-
-	s := "CREATE TABLE IF NOT EXISTS particles (id INTEGER, iter INTEGER, val REAL"
+	s := "CREATE TABLE IF NOT EXISTS " + TblParticles + " (particle INTEGER, iter INTEGER, val REAL"
 	s += it.xdbsql("define")
 	s += ");"
 
-	_, err = tx.Exec(s)
+	_, err := it.Db.Exec(s)
 	panicif(err)
 
-	s = "CREATE TABLE IF NOT EXISTS best (id INTEGER,iter INTEGER, val REAL"
+	s = "CREATE TABLE IF NOT EXISTS " + TblBest + " (iter INTEGER, val REAL"
 	s += it.xdbsql("define")
 	s += ");"
-	_, err = tx.Exec(s)
-	panicif(err)
-
-	s = "CREATE TABLE IF NOT EXISTS globalbest (iter INTEGER, val REAL"
-	s += it.xdbsql("define")
-	s += ");"
-	_, err = tx.Exec(s)
+	_, err = it.Db.Exec(s)
 	panicif(err)
 }
 
@@ -220,24 +215,19 @@ func (it Iterator) updateDb() {
 	}
 	defer tx.Commit()
 
-	s1 := "INSERT INTO particles (id,iter,val" + it.xdbsql("x") + ") VALUES (?,?,?" + it.xdbsql("?") + ");"
-	s2 := "INSERT INTO best (id,iter,val" + it.xdbsql("x") + ") VALUES (?,?,?" + it.xdbsql("?") + ");"
-	s3 := "INSERT INTO globalbest (iter,val" + it.xdbsql("x") + ") VALUES (?,?" + it.xdbsql("?") + ");"
+	s1 := "INSERT INTO " + TblParticles + " (particle,iter,val" + it.xdbsql("x") + ") VALUES (?,?,?" + it.xdbsql("?") + ");"
+	s2 := "INSERT INTO " + TblBest + " (iter,val" + it.xdbsql("x") + ") VALUES (?,?" + it.xdbsql("?") + ");"
 	for _, p := range it.Pop {
 		args := []interface{}{p.Id, it.count, p.Val}
 		args = append(args, pos2iface(p.Pos())...)
 		_, err := tx.Exec(s1, args...)
-		panicif(err)
-		args = []interface{}{p.Id, it.count, p.Val}
-		args = append(args, pos2iface(p.Best.Pos())...)
-		_, err = tx.Exec(s2, args...)
 		panicif(err)
 	}
 
 	glob := it.Pop.Best()
 	args := []interface{}{it.count, glob.Val}
 	args = append(args, pos2iface(glob.Pos())...)
-	_, err = tx.Exec(s3, args...)
+	_, err = tx.Exec(s2, args...)
 	panicif(err)
 }
 
@@ -298,6 +288,7 @@ func Speed(vel []float64) float64 {
 	return math.Sqrt(tot)
 }
 
+// TODO: remove all uses of this
 func panicif(err error) {
 	if err != nil {
 		panic(err.Error())

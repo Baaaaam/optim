@@ -26,7 +26,7 @@ func TestDb(t *testing.T) {
 	t.Logf("[INFO] %v evals: optimum is %v, got %v", neval, optimum, best.Val)
 
 	var count int
-	err = db.QueryRow("SELECT COUNT(*) FROM particles").Scan(&count)
+	err = db.QueryRow("SELECT COUNT(*) FROM " + TblParticles).Scan(&count)
 	if err != nil {
 		t.Errorf("[ERROR] particles table query failed: %v", err)
 	} else if count == 0 {
@@ -34,19 +34,11 @@ func TestDb(t *testing.T) {
 	}
 
 	count = 0
-	err = db.QueryRow("SELECT COUNT(*) FROM best").Scan(&count)
+	err = db.QueryRow("SELECT COUNT(*) FROM " + TblBest).Scan(&count)
 	if err != nil {
 		t.Errorf("[ERROR] best table query failed: %v", err)
 	} else if count == 0 {
 		t.Errorf("[ERROR] best table has no rows")
-	}
-
-	count = 0
-	err = db.QueryRow("SELECT COUNT(*) FROM globalbest").Scan(&count)
-	if err != nil {
-		t.Errorf("[ERROR] globalbest table query failed: %v", err)
-	} else if count == 0 {
-		t.Errorf("[ERROR] globalbest table has no rows")
 	}
 }
 
@@ -63,7 +55,6 @@ func TestSimple(t *testing.T) {
 		} else {
 			t.Errorf("[FAIL:%v] %v evals: optimum is %v, got %v", fn.Name(), neval, optimum, best.Val)
 		}
-		t.Log("final inertia was", it.Mover.InertiaFn(niter))
 	}
 }
 

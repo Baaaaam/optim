@@ -1,7 +1,9 @@
 package pattern
 
 import (
+	"database/sql"
 	"errors"
+	"fmt"
 	"math"
 
 	"github.com/rwcarlsen/optim"
@@ -10,6 +12,11 @@ import (
 
 var FoundBetterErr = errors.New("better position discovered")
 var ZeroStepErr = errors.New("poll step size contracted to zero")
+
+const (
+	TblPolls = "patternpolls"
+	TblInfo  = "patterninfo"
+)
 
 type Iterator struct {
 	ev               optim.Evaler
@@ -21,6 +28,8 @@ type Iterator struct {
 	NfailShrink      int  // number of successive failed polls before shrinking mesh
 	nsuccess         int  // (internal) number of successive successful polls
 	nfail            int  // (internal) number of successive failed polls
+	Db               *sql.DB
+	count            int
 }
 
 type Option func(*Iterator)
@@ -47,6 +56,12 @@ func ContinuousSearch(it *Iterator) {
 	it.ContinuousSearch = true
 }
 
+func DB(db *sql.DB) Option {
+	return func(it *Iterator) {
+		it.Db = db
+	}
+}
+
 func NewIterator(e optim.Evaler, start optim.Point, opts ...Option) *Iterator {
 	if e == nil {
 		e = optim.SerialEvaler{}
@@ -63,7 +78,70 @@ func NewIterator(e optim.Evaler, start optim.Point, opts ...Option) *Iterator {
 	for _, opt := range opts {
 		opt(it)
 	}
+	it.initdb()
 	return it
+}
+
+func (it *Iterator) initdb() {
+	if it.Db == nil {
+		return
+	}
+
+	s := "CREATE TABLE IF NOT EXISTS " + TblPolls + " (iter INTEGER,val REAL"
+	s += it.xdbsql("define")
+	s += ");"
+
+	_, err := it.Db.Exec(s)
+	panicif(err)
+
+	s = "CREATE TABLE IF NOT EXISTS " + TblInfo + " (iter INTEGER,nsearch INTEGER,npoll INTEGER,val REAL"
+	s += it.xdbsql("define")
+	s += ");"
+	_, err = it.Db.Exec(s)
+	panicif(err)
+}
+
+func (it Iterator) xdbsql(op string) string {
+	s := ""
+	for i := range it.curr.Pos() {
+		if op == "?" {
+			s += ",?"
+		} else if op == "define" {
+			s += fmt.Sprintf(",x%v REAL", i)
+		} else if op == "x" {
+			s += fmt.Sprintf(",x%v", i)
+		} else {
+			panic("invalid db op " + op)
+		}
+	}
+	return s
+}
+
+func (it Iterator) updateDb(nsearch, npoll *int) {
+	if it.Db == nil {
+		return
+	}
+
+	tx, err := it.Db.Begin()
+	if err != nil {
+		panic(err.Error())
+	}
+	defer tx.Commit()
+
+	s1 := "INSERT INTO " + TblPolls + " (iter,val" + it.xdbsql("x") + ") VALUES (?,?" + it.xdbsql("?") + ");"
+	for _, p := range it.Poller.Points() {
+		args := []interface{}{it.count, p.Val}
+		args = append(args, pos2iface(p.Pos())...)
+		_, err := tx.Exec(s1, args...)
+		panicif(err)
+	}
+
+	s2 := "INSERT INTO " + TblInfo + " (iter,nsearch, npoll,val" + it.xdbsql("x") + ") VALUES (?,?,?,?" + it.xdbsql("?") + ");"
+	glob := it.curr
+	args := []interface{}{it.count, *nsearch, *npoll, glob.Val}
+	args = append(args, pos2iface(glob.Pos())...)
+	_, err = tx.Exec(s2, args...)
+	panicif(err)
 }
 
 func (it *Iterator) AddPoint(p optim.Point) {
@@ -75,14 +153,19 @@ func (it *Iterator) AddPoint(p optim.Point) {
 // Iterate mutates m and so for each iteration, the same, mutated m should be
 // passed in.
 func (it *Iterator) Iterate(o optim.Objectiver, m mesh.Mesh) (best optim.Point, n int, err error) {
+	var nevalsearch, nevalpoll int
+	var success bool
+	defer it.updateDb(&nevalsearch, &nevalpoll)
+	it.count++
+
 	prevstep := m.Step()
 	if it.ContinuousSearch {
 		m.SetStep(0)
 	}
-	success, best, ns, err := it.Searcher.Search(o, m, it.curr)
+	success, best, nevalsearch, err = it.Searcher.Search(o, m, it.curr)
 	m.SetStep(prevstep)
 
-	n += ns
+	n += nevalsearch
 	if err != nil {
 		return best, n, err
 	} else if success {
@@ -92,8 +175,8 @@ func (it *Iterator) Iterate(o optim.Objectiver, m mesh.Mesh) (best optim.Point, 
 		return best, n, nil
 	}
 
-	success, best, np, err := it.Poller.Poll(o, it.ev, m, it.curr)
-	n += np
+	success, best, nevalpoll, err = it.Poller.Poll(o, it.ev, m, it.curr)
+	n += nevalpoll
 	if err != nil {
 		return it.curr, n, err
 	} else if success {
@@ -122,7 +205,15 @@ func (it *Iterator) Iterate(o optim.Objectiver, m mesh.Mesh) (best optim.Point, 
 }
 
 type Poller interface {
+	// Poll polls on mesh m centered on point from.  It is responsible for
+	// selecting points and evaluating them with ev using obj.  If a better
+	// point was found, it returns success == true, the point, and number of
+	// evaluations.  If a better point was not found, it returns false, the
+	// from point, and the number of evaluations.  If err is non-nil, success
+	// must be false and best must be from - neval may be non-zero.
 	Poll(obj optim.Objectiver, ev optim.Evaler, m mesh.Mesh, from optim.Point) (success bool, best optim.Point, neval int, err error)
+	// Points returns the points that were checked on the most recent poll
+	Points() []optim.Point
 }
 
 type CompassPoller struct {
@@ -132,8 +223,9 @@ type CompassPoller struct {
 	// Nkeep specifies the number of previous successful poll directions to
 	// reuse on the next poll. The number of reused directions is min(Nkeep,
 	// nsuccessful).
-	Nkeep int
+	Nkeep      int
 	keepdirecs [][]int
+	points     []optim.Point
 }
 
 func direcbetween(from, to optim.Point, m mesh.Mesh) []int {
@@ -145,6 +237,8 @@ func direcbetween(from, to optim.Point, m mesh.Mesh) []int {
 	return d
 }
 
+func (cp *CompassPoller) Points() []optim.Point { return cp.points }
+
 func (cp *CompassPoller) Poll(obj optim.Objectiver, ev optim.Evaler, m mesh.Mesh, from optim.Point) (success bool, best optim.Point, neval int, err error) {
 	best = from
 
@@ -155,7 +249,7 @@ func (cp *CompassPoller) Poll(obj optim.Objectiver, ev optim.Evaler, m mesh.Mesh
 	}
 	cp.keepdirecs = nil
 
-	points := make([]optim.Point, 0, len(pollpoints))
+	cp.points = make([]optim.Point, 0, len(pollpoints))
 	for _, p := range pollpoints {
 		// It is possible that due to the mesh gridding, the poll point is
 		// outside of constraints or bounds and will be rounded back to the
@@ -164,12 +258,12 @@ func (cp *CompassPoller) Poll(obj optim.Objectiver, ev optim.Evaler, m mesh.Mesh
 		dist := optim.L2Dist(from, p)
 		eps := 1e-10
 		if dist > eps {
-			points = append(points, p)
+			cp.points = append(cp.points, p)
 		}
 	}
 
 	objstop := &ObjStopper{Objectiver: obj, Best: from.Val}
-	results, n, err := ev.Eval(objstop, points...)
+	results, n, err := ev.Eval(objstop, cp.points...)
 	if err != nil && err != FoundBetterErr {
 		return false, best, n, err
 	}
@@ -253,7 +347,7 @@ func genPollPoints(from optim.Point, m mesh.Mesh) []optim.Point {
 func pointFromDirec(from optim.Point, direc []int, m mesh.Mesh) optim.Point {
 	pos := make([]float64, from.Len())
 	for i := range pos {
-		pos[i] = from.At(i) + float64(direc[i]) * m.Step()
+		pos[i] = from.At(i) + float64(direc[i])*m.Step()
 
 	}
 	p := optim.NewPoint(pos, math.Inf(1))
@@ -280,4 +374,19 @@ func genRandPollPoints(from optim.Point, m mesh.Mesh, n int) []optim.Point {
 		}
 	}
 	return polls
+}
+
+func pos2iface(pos []float64) []interface{} {
+	iface := []interface{}{}
+	for _, v := range pos {
+		iface = append(iface, v)
+	}
+	return iface
+}
+
+// TODO: remove all uses of this
+func panicif(err error) {
+	if err != nil {
+		panic(err.Error())
+	}
 }
