@@ -47,13 +47,13 @@ func TestSimple(t *testing.T) {
 		optimum := fn.Optima()[0].Val
 		it := buildIter(fn, nil)
 
-		best, _, neval, err := bench.Benchmark(it, fn, .01, maxeval)
+		best, niter, neval, err := bench.Benchmark(it, fn, .01, maxeval)
 		if err != nil {
-			t.Errorf("[FAIL:%v] %v evals: optimum is %v, got %v. %v", fn.Name(), neval, optimum, best.Val, err)
+			t.Errorf("[FAIL:%v] %v evals (%v iter): optimum is %v, got %v. %v", fn.Name(), neval, niter, optimum, best.Val, err)
 		} else if neval < maxeval {
-			t.Logf("[pass:%v] %v evals: optimum is %v, got %v", fn.Name(), neval, optimum, best.Val)
+			t.Logf("[pass:%v] %v evals (%v iter): optimum is %v, got %v", fn.Name(), neval, niter, optimum, best.Val)
 		} else {
-			t.Errorf("[FAIL:%v] %v evals: optimum is %v, got %v", fn.Name(), neval, optimum, best.Val)
+			t.Errorf("[FAIL:%v] %v evals (%v iter): optimum is %v, got %v", fn.Name(), neval, niter, optimum, best.Val)
 		}
 	}
 }
