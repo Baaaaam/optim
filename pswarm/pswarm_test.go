@@ -74,5 +74,7 @@ func buildIter(fn bench.Func, db *sql.DB) *Iterator {
 
 	points := pop.New(n, low, up)
 	pop := NewPopulation(points, minv, maxv)
-	return NewIterator(nil, nil, pop, LinInertia(0.9, 0.4, maxeval/n), DB(db))
+	return NewIterator(nil, nil, pop,
+		LinInertia(0.9, 0.4, maxeval/n), DB(db),
+	)
 }

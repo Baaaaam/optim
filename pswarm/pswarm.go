@@ -265,6 +265,8 @@ func (it *Iterator) updateDb() {
 type Mover struct {
 	Cognition float64
 	Social    float64
+	// Vmax is the speed limit for particles.  If not specified,
+	// Vmax=1.5*currVel.
 	Vmax      float64
 	InertiaFn func(int) float64
 	iter      int
@@ -290,7 +292,7 @@ func (mv *Mover) Move(best optim.Point, pop Population) {
 		// update velocity
 		for i, currv := range p.Vel {
 			p.Vel[i] = mv.InertiaFn(mv.iter)*currv +
-				mv.Cognition*w1*(best.At(i)-p.At(i)) +
+				mv.Cognition*w1*(p.Best.At(i)-p.At(i)) +
 				mv.Social*w2*(best.At(i)-p.At(i))
 			if s := Speed(p.Vel); mv.Vmax > 0 && Speed(p.Vel) > mv.Vmax {
 				for i := range p.Vel {
