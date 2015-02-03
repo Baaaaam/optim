@@ -23,17 +23,51 @@ type Rng interface {
 
 func RandFloat() float64 { return Rand.Float64() }
 
-func Solve(it Iterator, obj Objectiver, m mesh.Mesh, maxiter, maxeval int) (best Point, niter, neval int, err error) {
-	for neval < maxeval && niter < maxiter {
-		var n int
-		best, n, err = it.Iterate(obj, m)
-		neval += n
-		niter++
-		if err != nil {
-			return best, niter, neval, err
-		}
+type Solver struct {
+	Iter         Iterator
+	Obj          Objectiver
+	Mesh         mesh.Mesh
+	MaxIter      int
+	MaxEval      int
+	MaxNoImprove int
+
+	neval, niter int
+	noimprove    int
+	best         Point
+	err          error
+}
+
+func (s *Solver) Best() Point { return s.best }
+func (s *Solver) Niter() int  { return s.niter }
+func (s *Solver) Neval() int  { return s.neval }
+func (s *Solver) Err() error  { return s.err }
+
+func (s *Solver) Next() (more bool) {
+	if s.niter == 0 {
+		s.best.Val = math.Inf(1)
 	}
-	return best, niter, neval, nil
+
+	var n int
+	var best Point
+	best, n, s.err = s.Iter.Iterate(s.Obj, s.Mesh)
+	s.neval += n
+	s.niter++
+
+	if best.Val < s.best.Val {
+		s.best = best
+		s.noimprove = 0
+	} else {
+		s.noimprove++
+	}
+
+	if s.err != nil {
+		return false
+	}
+
+	more = (s.MaxNoImprove == 0 || s.noimprove < s.MaxNoImprove)
+	more = more || (s.MaxIter == 0 || s.niter < s.MaxIter)
+	more = more || (s.MaxEval == 0 || s.neval < s.MaxEval)
+	return more
 }
 
 type Point struct {
