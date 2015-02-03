@@ -145,13 +145,13 @@ func NewIterator(e optim.Evaler, m *Mover, pop Population, opts ...Option) *Iter
 	return it
 }
 
-func (it Iterator) AddPoint(p optim.Point) {
+func (it *Iterator) AddPoint(p optim.Point) {
 	if p.Val < it.best.Val {
 		it.best = p
 	}
 }
 
-func (it Iterator) Iterate(obj optim.Objectiver, m mesh.Mesh) (best optim.Point, neval int, err error) {
+func (it *Iterator) Iterate(obj optim.Objectiver, m mesh.Mesh) (best optim.Point, neval int, err error) {
 	it.count++
 	points := it.Pop.Points()
 	if m != nil {
@@ -207,7 +207,7 @@ func (it *Iterator) initdb() {
 	panicif(err)
 }
 
-func (it Iterator) xdbsql(op string) string {
+func (it *Iterator) xdbsql(op string) string {
 	s := ""
 	for i := range it.Pop[0].Pos() {
 		if op == "?" {
@@ -231,7 +231,7 @@ func pos2iface(pos []float64) []interface{} {
 	return iface
 }
 
-func (it Iterator) updateDb() {
+func (it *Iterator) updateDb() {
 	if it.Db == nil {
 		return
 	}
