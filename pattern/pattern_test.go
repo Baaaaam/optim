@@ -86,13 +86,13 @@ func TestHybridCache(t *testing.T) {
 		optimum := fn.Optima()[0].Val
 		it := buildHybrid(fn, true)
 
-		best, _, n, err := bench.Benchmark(it, fn, .01, maxeval)
+		best, niter, n, err := bench.Benchmark(it, fn, .01, maxeval)
 		if err != nil {
-			t.Errorf("[FAIL:%v] %v evals: optimum is %v, got %v. %v", fn.Name(), n, optimum, best.Val, err)
+			t.Errorf("[FAIL:%v] %v evals (%v iter): optimum is %v, got %v. %v", fn.Name(), n, niter, optimum, best.Val, err)
 		} else if n < maxeval {
-			t.Logf("[pass:%v] %v evals: optimum is %v, got %v", fn.Name(), n, optimum, best.Val)
+			t.Logf("[pass:%v] %v evals (%v iter): optimum is %v, got %v", fn.Name(), n, niter, optimum, best.Val)
 		} else {
-			t.Errorf("[FAIL:%v] %v evals: optimum is %v, got %v", fn.Name(), n, optimum, best.Val)
+			t.Errorf("[FAIL:%v] %v evals (%v iter): optimum is %v, got %v", fn.Name(), n, niter, optimum, best.Val)
 		}
 	}
 }
@@ -133,9 +133,9 @@ func buildHybrid(fn bench.Func, cache bool) optim.Iterator {
 	}
 	maxmaxv = math.Sqrt(maxmaxv)
 
-	n := 10 + 10*len(low)
-	if n > maxeval/100 {
-		n = maxeval / 100
+	n := 10 + 5*len(low)
+	if n > maxeval/120 {
+		n = maxeval / 120
 	}
 	points := pop.New(n, low, up)
 

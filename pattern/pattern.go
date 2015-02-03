@@ -24,7 +24,7 @@ type Iterator struct {
 	Searcher         Searcher
 	curr             optim.Point
 	ContinuousSearch bool // true to not project search points onto poll step size mesh
-	NfailGrow        int  // number of successive successful polls before growing mesh
+	NsuccessGrow     int  // number of successive successful polls before growing mesh
 	NfailShrink      int  // number of successive failed polls before shrinking mesh
 	nsuccess         int  // (internal) number of successive successful polls
 	nfail            int  // (internal) number of successive failed polls
@@ -34,9 +34,9 @@ type Iterator struct {
 
 type Option func(*Iterator)
 
-func NfailGrow(n int) Option {
+func NsuccessGrow(n int) Option {
 	return func(it *Iterator) {
-		it.NfailGrow = n
+		it.NsuccessGrow = n
 	}
 }
 
@@ -67,12 +67,12 @@ func NewIterator(e optim.Evaler, start optim.Point, opts ...Option) *Iterator {
 		e = optim.SerialEvaler{}
 	}
 	it := &Iterator{
-		curr:        start,
-		ev:          e,
-		Poller:      &CompassPoller{Nrandom: start.Len() * 4, Nkeep: start.Len()},
-		Searcher:    NullSearcher{},
-		NfailShrink: 1,
-		NfailGrow:   2,
+		curr:         start,
+		ev:           e,
+		Poller:       &CompassPoller{Nrandom: start.Len() * 4, Nkeep: start.Len()},
+		Searcher:     NullSearcher{},
+		NfailShrink:  1,
+		NsuccessGrow: 2,
 	}
 
 	for _, opt := range opts {
@@ -182,7 +182,7 @@ func (it *Iterator) Iterate(o optim.Objectiver, m mesh.Mesh) (best optim.Point, 
 	} else if success {
 		it.nsuccess++
 		it.nfail = 0
-		if it.nsuccess == it.NfailGrow { // == allows -1 to mean never grow
+		if it.nsuccess == it.NsuccessGrow { // == allows -1 to mean never grow
 			m.SetStep(m.Step() * 2.0)
 			it.nsuccess = 0 // reset after resize
 		}

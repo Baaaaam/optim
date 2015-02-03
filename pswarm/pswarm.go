@@ -65,6 +65,10 @@ func (pop Population) Points() []optim.Point {
 }
 
 func (pop Population) Best() *Particle {
+	if len(pop) == 0 {
+		return nil
+	}
+
 	best := pop[0]
 	for _, p := range pop[1:] {
 		if p.Val < best.Val {
@@ -172,7 +176,7 @@ func (it *Iterator) Iterate(obj optim.Objectiver, m mesh.Mesh) (best optim.Point
 	it.Mover.Move(it.best, it.Pop)
 
 	pbest := it.Pop.Best()
-	if pbest.Val < it.best.Val {
+	if pbest != nil && pbest.Val < it.best.Val {
 		it.best = pbest.Best
 		// only kill if moving particles found a new best
 		if it.KillDist > 0 && optim.L2Dist(pbest.Point, it.best) < it.KillDist {
