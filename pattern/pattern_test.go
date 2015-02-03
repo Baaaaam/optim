@@ -79,7 +79,9 @@ func TestHybridNocache(t *testing.T) {
 }
 
 func TestHybridCache(t *testing.T) {
-	for _, fn := range bench.AllFuncs {
+	funcs := bench.AllFuncs
+	//funcs := []bench.Func{bench.Eggholder{}}
+	for _, fn := range funcs {
 		optimum := fn.Optima()[0].Val
 		it := buildHybrid(fn, true)
 
@@ -110,6 +112,9 @@ func initialpoint(low, up []float64) optim.Point {
 
 func buildHybrid(fn bench.Func, cache bool) optim.Iterator {
 	//optim.Rand = rand.New(rand.NewSource(time.Now().Unix()))
+	//os.Remove("hybrid.sqlite")
+	//db, _ := sql.Open("sqlite3", "hybrid.sqlite")
+
 	start := initialpoint(fn.Bounds())
 
 	low, up := fn.Bounds()
@@ -130,7 +135,7 @@ func buildHybrid(fn bench.Func, cache bool) optim.Iterator {
 	}
 	maxmaxv = math.Sqrt(maxmaxv)
 
-	n := 10 + 5*len(low)
+	n := 10 + 7*len(low)
 	if n > maxeval/120 {
 		n = maxeval / 120
 	}
@@ -141,6 +146,11 @@ func buildHybrid(fn bench.Func, cache bool) optim.Iterator {
 	swarm := pswarm.NewIterator(ev, nil, pop,
 		pswarm.LinInertia(0.9, 0.4, maxeval/n),
 		pswarm.Vmax(maxmaxv),
+		pswarm.VelUpdParams(.5, .5),
+		//pswarm.DB(db),
 	)
-	return NewIterator(ev, start, SearchIter(swarm))
+	return NewIterator(ev, start, SearchIter(swarm),
+		//DB(db),
+		ContinuousSearch,
+	)
 }

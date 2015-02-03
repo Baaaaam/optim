@@ -95,7 +95,7 @@ func (it *Iterator) initdb() {
 	_, err := it.Db.Exec(s)
 	panicif(err)
 
-	s = "CREATE TABLE IF NOT EXISTS " + TblInfo + " (iter INTEGER,nsearch INTEGER,npoll INTEGER,val REAL"
+	s = "CREATE TABLE IF NOT EXISTS " + TblInfo + " (iter INTEGER,step INTEGER,nsearch INTEGER,npoll INTEGER,val REAL"
 	s += it.xdbsql("define")
 	s += ");"
 	_, err = it.Db.Exec(s)
@@ -118,7 +118,7 @@ func (it Iterator) xdbsql(op string) string {
 	return s
 }
 
-func (it Iterator) updateDb(nsearch, npoll *int) {
+func (it Iterator) updateDb(nsearch, npoll *int, step float64) {
 	if it.Db == nil {
 		return
 	}
@@ -137,9 +137,9 @@ func (it Iterator) updateDb(nsearch, npoll *int) {
 		panicif(err)
 	}
 
-	s2 := "INSERT INTO " + TblInfo + " (iter,nsearch, npoll,val" + it.xdbsql("x") + ") VALUES (?,?,?,?" + it.xdbsql("?") + ");"
+	s2 := "INSERT INTO " + TblInfo + " (iter,step,nsearch, npoll,val" + it.xdbsql("x") + ") VALUES (?,?,?,?,?" + it.xdbsql("?") + ");"
 	glob := it.curr
-	args := []interface{}{it.count, *nsearch, *npoll, glob.Val}
+	args := []interface{}{it.count, step, *nsearch, *npoll, glob.Val}
 	args = append(args, pos2iface(glob.Pos())...)
 	_, err = tx.Exec(s2, args...)
 	panicif(err)
@@ -156,7 +156,7 @@ func (it *Iterator) AddPoint(p optim.Point) {
 func (it *Iterator) Iterate(o optim.Objectiver, m mesh.Mesh) (best optim.Point, n int, err error) {
 	var nevalsearch, nevalpoll int
 	var success bool
-	defer it.updateDb(&nevalsearch, &nevalpoll)
+	defer it.updateDb(&nevalsearch, &nevalpoll, m.Step())
 	it.count++
 
 	prevstep := m.Step()
@@ -228,6 +228,7 @@ type CompassPoller struct {
 	keepdirecs [][]int
 	points     []optim.Point
 	prevhash   [sha1.Size]byte
+	prevstep   float64
 }
 
 func (cp *CompassPoller) Points() []optim.Point { return cp.points }
@@ -239,13 +240,16 @@ func (cp *CompassPoller) Poll(obj optim.Objectiver, ev optim.Evaler, m mesh.Mesh
 	// Only poll compass directions if we haven't polled from this point
 	// before.
 	h := from.Hash()
-	if h != cp.prevhash {
+	if h != cp.prevhash || cp.prevstep != m.Step() {
+		// TODO: write test that checks we poll compass dirs again if only mesh
+		// step changed (and not from point)
 		pollpoints = append(pollpoints, genPollPoints(from, m)...)
 		cp.prevhash = h
 	} else {
-		// Use random points instead.
+		// Use random directions instead.
 		pollpoints = append(pollpoints, genRandPollPoints(from, m, 2*from.Len())...)
 	}
+	cp.prevstep = m.Step()
 
 	pollpoints = append(pollpoints, genRandPollPoints(from, m, cp.Nrandom)...)
 
@@ -267,6 +271,7 @@ func (cp *CompassPoller) Poll(obj optim.Objectiver, ev optim.Evaler, m mesh.Mesh
 			cp.points = append(cp.points, p)
 		}
 	}
+	cp.points = pollpoints
 
 	objstop := &ObjStopper{Objectiver: obj, Best: from.Val}
 	results, n, err := ev.Eval(objstop, cp.points...)

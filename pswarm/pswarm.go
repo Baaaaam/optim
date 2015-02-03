@@ -10,8 +10,8 @@ import (
 )
 
 const (
-	DefaultCognition = 0.5
-	DefaultSocial    = 0.5
+	DefaultCognition = 1.5
+	DefaultSocial    = 1.5
 	DefaultInertia   = 0.9
 )
 
@@ -71,7 +71,8 @@ func (pop Population) Best() *Particle {
 
 	best := pop[0]
 	for _, p := range pop[1:] {
-		if p.Val < best.Val {
+		// TODO: write test to make sure this checks p.Best.Val instead of p.Val.
+		if p.Best.Val < best.Val {
 			best = p
 		}
 	}
@@ -176,7 +177,8 @@ func (it *Iterator) Iterate(obj optim.Objectiver, m mesh.Mesh) (best optim.Point
 	it.Mover.Move(it.best, it.Pop)
 
 	pbest := it.Pop.Best()
-	if pbest != nil && pbest.Val < it.best.Val {
+	// TODO: write test to make sure this checks pbest.Best.Val instead of p.Val.
+	if pbest != nil && pbest.Best.Val < it.best.Val {
 		it.best = pbest.Best
 		// only kill if moving particles found a new best
 		if it.KillDist > 0 && optim.L2Dist(pbest.Point, it.best) < it.KillDist {
@@ -284,7 +286,8 @@ func (mv *Mover) Move(best optim.Point, pop Population) {
 		vmax := mv.Vmax
 		if mv.Vmax == 0 {
 			// if no vmax is given, use 1.5 * current speed
-			vmax = 1.5 * Speed(p.Vel)
+			//vmax = 1.5 * Speed(p.Vel)
+			vmax = math.Inf(1)
 		}
 
 		w1 := optim.RandFloat()
@@ -294,7 +297,7 @@ func (mv *Mover) Move(best optim.Point, pop Population) {
 			p.Vel[i] = mv.InertiaFn(mv.iter)*currv +
 				mv.Cognition*w1*(p.Best.At(i)-p.At(i)) +
 				mv.Social*w2*(best.At(i)-p.At(i))
-			if s := Speed(p.Vel); mv.Vmax > 0 && Speed(p.Vel) > mv.Vmax {
+			if s := Speed(p.Vel); s > vmax {
 				for i := range p.Vel {
 					p.Vel[i] *= vmax / s
 				}
@@ -307,7 +310,7 @@ func (mv *Mover) Move(best optim.Point, pop Population) {
 		for i := range pos {
 			pos[i] = p.At(i) + p.Vel[i]
 		}
-		p.Point = optim.NewPoint(pos, p.Val)
+		p.Point = optim.NewPoint(pos, math.Inf(1))
 	}
 }
 
