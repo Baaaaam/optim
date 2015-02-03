@@ -62,9 +62,6 @@ func TestCompass(t *testing.T) {
 	}
 }
 
-//var seed = time.Now().Unix()
-var seed int64 = 2
-
 func TestHybridNocache(t *testing.T) {
 	for _, fn := range bench.AllFuncs {
 		optimum := fn.Optima()[0].Val
@@ -112,7 +109,7 @@ func initialpoint(low, up []float64) optim.Point {
 }
 
 func buildHybrid(fn bench.Func, cache bool) optim.Iterator {
-	rand.Seed(seed)
+	//optim.Rand = rand.New(rand.NewSource(time.Now().Unix()))
 	start := initialpoint(fn.Bounds())
 
 	low, up := fn.Bounds()
@@ -145,5 +142,5 @@ func buildHybrid(fn bench.Func, cache bool) optim.Iterator {
 		pswarm.LinInertia(0.9, 0.4, maxeval/n),
 		pswarm.Vmax(maxmaxv),
 	)
-	return NewIterator(ev, start, SearchIter(swarm), NfailShrink(2))
+	return NewIterator(ev, start, SearchIter(swarm))
 }

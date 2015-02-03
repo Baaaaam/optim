@@ -1,6 +1,7 @@
 package pattern
 
 import (
+	"crypto/sha1"
 	"database/sql"
 	"errors"
 	"fmt"
@@ -71,7 +72,7 @@ func NewIterator(e optim.Evaler, start optim.Point, opts ...Option) *Iterator {
 		ev:           e,
 		Poller:       &CompassPoller{Nrandom: start.Len() * 2, Nkeep: start.Len()},
 		Searcher:     NullSearcher{},
-		NfailShrink:  1,
+		NfailShrink:  2,
 		NsuccessGrow: 2,
 	}
 
@@ -226,24 +227,29 @@ type CompassPoller struct {
 	Nkeep      int
 	keepdirecs [][]int
 	points     []optim.Point
-}
-
-func direcbetween(from, to optim.Point, m mesh.Mesh) []int {
-	d := make([]int, from.Len())
-	step := m.Step()
-	for i := 0; i < from.Len(); i++ {
-		d[i] = int((to.At(i) - from.At(i)) / step)
-	}
-	return d
+	prevhash   [sha1.Size]byte
 }
 
 func (cp *CompassPoller) Points() []optim.Point { return cp.points }
 
 func (cp *CompassPoller) Poll(obj optim.Objectiver, ev optim.Evaler, m mesh.Mesh, from optim.Point) (success bool, best optim.Point, neval int, err error) {
 	best = from
+	pollpoints := []optim.Point{}
 
-	pollpoints := genPollPoints(from, m)
+	// Only poll compass directions if we haven't polled from this point
+	// before.
+	h := from.Hash()
+	if h != cp.prevhash {
+		pollpoints = append(pollpoints, genPollPoints(from, m)...)
+		cp.prevhash = h
+	} else {
+		// Use random points instead.
+		pollpoints = append(pollpoints, genRandPollPoints(from, m, 2*from.Len())...)
+	}
+
 	pollpoints = append(pollpoints, genRandPollPoints(from, m, cp.Nrandom)...)
+
+	// Add successful directions from last poll.
 	for _, dir := range cp.keepdirecs {
 		pollpoints = append(pollpoints, pointFromDirec(from, dir, m))
 	}
@@ -355,31 +361,34 @@ func pointFromDirec(from optim.Point, direc []int, m mesh.Mesh) optim.Point {
 }
 
 func genRandPollPoints(from optim.Point, m mesh.Mesh, n int) []optim.Point {
-	rmax := 6
 	ndim := from.Len()
 	polls := make([]optim.Point, 0, n)
 	for len(polls) < n {
 		d1 := make([]int, ndim)
 		d2 := make([]int, ndim)
 
-		hasnonzero := false
-		for i := 0; i < ndim; i++ {
-			r := optim.Rand.Intn(rmax)
-			v := 0
-			if r == 0 { // prob = 1/rmax
-				v = 1
-			} else if r == 1 { // prob = 1/rmax
-				v = -1
+		nNonzero := 1
+		if ndim == 1 { // compass directions cover everything
+			return polls
+		} else if ndim == 2 { // this check prevents calling Intn(0) - which is invalid
+			nNonzero = 2 // exclude compass directions
+		} else {
+			// Intn(-2)+2 is to exclude vector of all zeros and compass directions.
+			nNonzero = optim.Rand.Intn(ndim-2) + 2
+		}
+		perms := optim.Rand.Perm(ndim)
+		for i := 0; i < nNonzero; i++ {
+			r := optim.Rand.Intn(2)
+			if r == 0 {
+				d1[perms[i]] = 1
+				d2[perms[i]] = -1
+			} else {
+				d1[perms[i]] = -1
+				d2[perms[i]] = 1
 			}
-
-			d1[i] += v
-			d2[i] += -v
-			hasnonzero = hasnonzero || (v != 0)
 		}
-		if hasnonzero {
-			polls = append(polls, pointFromDirec(from, d1, m))
-			polls = append(polls, pointFromDirec(from, d2, m))
-		}
+		polls = append(polls, pointFromDirec(from, d1, m))
+		polls = append(polls, pointFromDirec(from, d2, m))
 	}
 	return polls
 }
@@ -390,6 +399,15 @@ func pos2iface(pos []float64) []interface{} {
 		iface = append(iface, v)
 	}
 	return iface
+}
+
+func direcbetween(from, to optim.Point, m mesh.Mesh) []int {
+	d := make([]int, from.Len())
+	step := m.Step()
+	for i := 0; i < from.Len(); i++ {
+		d[i] = int((to.At(i) - from.At(i)) / step)
+	}
+	return d
 }
 
 // TODO: remove all uses of this

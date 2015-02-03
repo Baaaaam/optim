@@ -18,6 +18,7 @@ var Rand Rng = rand.New(rand.NewSource(1))
 type Rng interface {
 	Float64() float64
 	Intn(n int) int
+	Perm(n int) []int
 }
 
 func RandFloat() float64 { return Rand.Float64() }
@@ -52,6 +53,14 @@ func (p Point) Len() int { return len(p.pos) }
 
 func (p Point) Clone() Point { return NewPoint(p.pos, p.Val) }
 
+func (p Point) Hash() [sha1.Size]byte {
+	data := make([]byte, p.Len()*8)
+	for i := 0; i < p.Len(); i++ {
+		binary.BigEndian.PutUint64(data[i*8:], math.Float64bits(p.At(i)))
+	}
+	return sha1.Sum(data)
+}
+
 func (p Point) Matrix() *mat64.Dense {
 	return mat64.NewDense(p.Len(), 1, p.Pos())
 }
@@ -64,14 +73,6 @@ func (p Point) Pos() []float64 {
 
 func (p Point) String() string {
 	return fmt.Sprintf("f%v = %v", p.pos, p.Val)
-}
-
-func hashPoint(p Point) [sha1.Size]byte {
-	data := make([]byte, p.Len()*8)
-	for i := 0; i < p.Len(); i++ {
-		binary.BigEndian.PutUint64(data[i*8:], math.Float64bits(p.At(i)))
-	}
-	return sha1.Sum(data)
 }
 
 type Iterator interface {
@@ -123,7 +124,7 @@ func (ev *CacheEvaler) Eval(obj Objectiver, points ...Point) (results []Point, n
 	fromnew := make([]int, 0, len(points))
 	newp := make([]Point, 0, len(points))
 	for i, p := range points {
-		h := hashPoint(p)
+		h := p.Hash()
 		if val, ok := ev.cache[h]; ok {
 			p.Val = val
 			ev.UseCount++
@@ -136,7 +137,7 @@ func (ev *CacheEvaler) Eval(obj Objectiver, points ...Point) (results []Point, n
 
 	newresults, n, err := ev.ev.Eval(obj, newp...)
 	for _, p := range newresults {
-		ev.cache[hashPoint(p)] = p.Val
+		ev.cache[p.Hash()] = p.Val
 	}
 
 	for i, p := range newresults {
@@ -192,7 +193,7 @@ func uniqof(points []Point) (indexes []int) {
 	indexes = make([]int, len(points))
 	alreadyhave := map[[sha1.Size]byte]int{}
 	for i, p := range points {
-		h := hashPoint(p)
+		h := p.Hash()
 		if v, ok := alreadyhave[h]; !ok {
 			alreadyhave[h] = i
 			indexes[i] = i

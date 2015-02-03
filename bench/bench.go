@@ -219,11 +219,13 @@ func (fn Rosenbrock) Eval(x []float64) float64 {
 		return math.Inf(1)
 	}
 
-	tot := 0.0
+	tot1 := 0.0
+	tot2 := 0.0
 	for i := 0; i < fn.NDim-1; i++ {
-		tot += 100*math.Pow(x[i+1]-x[i]*x[i], 2) + math.Pow(x[i]-1, 2)
+		tot1 += math.Pow(x[i+1]-x[i]*x[i], 2)
+		tot2 += math.Pow(x[i]-1, 2)
 	}
-	return tot
+	return 100*tot1 + tot2
 }
 
 func (fn Rosenbrock) Bounds() (low, up []float64) {
