@@ -68,8 +68,8 @@ func buildIter(fn bench.Func, db *sql.DB) *Iterator {
 	}
 
 	n := 10 + 7*len(low)
-	if n > maxeval/1000 {
-		n = maxeval / 1000
+	if n > maxeval/110 {
+		n = maxeval / 110
 	}
 
 	points := pop.New(n, low, up)
