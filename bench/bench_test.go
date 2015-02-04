@@ -6,6 +6,7 @@ import (
 	"math/rand"
 	"testing"
 
+	_ "github.com/mxk/go-sqlite/sqlite3"
 	"github.com/rwcarlsen/optim"
 	"github.com/rwcarlsen/optim/mesh"
 	"github.com/rwcarlsen/optim/pattern"
@@ -25,10 +26,13 @@ const (
 	minstep      = 1e-6
 )
 
+//var seed int64 = time.Now().Unix()
+var seed int64 = 1
+
 func TestPattern(t *testing.T) {
 	for _, fn := range AllFuncs {
-		db, _ := sql.Open("sqlite3", fn.Name()+".sqlite")
-		it, m := patternsolver(fn, db)
+		//db, _ := sql.Open("sqlite3", fn.Name()+".sqlite")
+		it, m := patternsolver(fn, nil)
 		solv := &optim.Solver{
 			Iter:         it,
 			Obj:          optim.Func(fn.Eval),
@@ -95,6 +99,7 @@ func TestPSwarmCache(t *testing.T) {
 }
 
 func patternsolver(fn Func, db *sql.DB) (optim.Iterator, mesh.Mesh) {
+	optim.Rand = rand.New(rand.NewSource(seed))
 	low, up := fn.Bounds()
 	max, min := up[0], low[0]
 	m := mesh.NewBounded(&mesh.Infinite{StepSize: (max - min) / 10}, low, up)
@@ -107,6 +112,8 @@ func patternsolver(fn Func, db *sql.DB) (optim.Iterator, mesh.Mesh) {
 }
 
 func swarmsolver(fn Func, db *sql.DB) (optim.Iterator, mesh.Mesh) {
+	optim.Rand = rand.New(rand.NewSource(seed))
+
 	low, up := fn.Bounds()
 	m := mesh.NewBounded(&mesh.Infinite{StepSize: 0}, low, up)
 
@@ -124,6 +131,8 @@ func swarmsolver(fn Func, db *sql.DB) (optim.Iterator, mesh.Mesh) {
 }
 
 func pswarmsolver(fn Func, db *sql.DB, cache bool) (optim.Iterator, mesh.Mesh) {
+	optim.Rand = rand.New(rand.NewSource(seed))
+
 	low, up := fn.Bounds()
 	max, min := up[0], low[0]
 	m := mesh.NewBounded(&mesh.Infinite{StepSize: (max - min) / 10}, low, up)

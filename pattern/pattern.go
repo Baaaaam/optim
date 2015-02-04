@@ -171,7 +171,7 @@ func (it *Iterator) Iterate(o optim.Objectiver, m mesh.Mesh) (best optim.Point, 
 	// current mesh grid.  This doesn't need to happen if search succeeds
 	// because search either always operates on the same grid, or always
 	// operates in continuous space.
-	m.SetOrigin(best.Pos())
+	m.SetOrigin(it.curr.Pos()) // TODO: test that this doesn't get set to Zero pos [0 0 0...] on first iteration.
 
 	success, best, nevalpoll, err = it.Poller.Poll(o, it.ev, m, it.curr)
 	n += nevalpoll
@@ -295,7 +295,7 @@ type Searcher interface {
 type NullSearcher struct{}
 
 func (_ NullSearcher) Search(o optim.Objectiver, m mesh.Mesh, curr optim.Point) (success bool, best optim.Point, n int, err error) {
-	return false, optim.Point{}, 0, nil
+	return false, curr, 0, nil // TODO: test that this returns curr instead of something else
 }
 
 type WrapSearcher struct {
