@@ -27,12 +27,6 @@ func NsuccessGrow(n int) Option {
 	}
 }
 
-func NfailShrink(n int) Option {
-	return func(it *Iterator) {
-		it.NfailShrink = n
-	}
-}
-
 func SearchIter(it optim.Iterator) Option {
 	return func(iter *Iterator) {
 		iter.Searcher = &WrapSearcher{Iter: it}
@@ -56,9 +50,7 @@ type Iterator struct {
 	curr             optim.Point
 	ContinuousSearch bool // true to not project search points onto poll step size mesh
 	NsuccessGrow     int  // number of successive successful polls before growing mesh
-	NfailShrink      int  // number of successive failed polls before shrinking mesh
 	nsuccess         int  // (internal) number of successive successful polls
-	nfail            int  // (internal) number of successive failed polls
 	Db               *sql.DB
 	count            int
 }
@@ -72,7 +64,6 @@ func NewIterator(e optim.Evaler, start optim.Point, opts ...Option) *Iterator {
 		ev:           e,
 		Poller:       &CompassPoller{Nkeep: start.Len()},
 		Searcher:     NullSearcher{},
-		NfailShrink:  1,
 		NsuccessGrow: 2,
 	}
 
@@ -171,36 +162,41 @@ func (it *Iterator) Iterate(o optim.Objectiver, m mesh.Mesh) (best optim.Point, 
 	if err != nil {
 		return best, n, err
 	} else if success {
-		it.nfail = 0
 		it.curr = best
-		m.SetOrigin(best.Pos()) // important to recenter mesh on new best point
 		return best, n, nil
 	}
+
+	// It is important to recenter mesh on new best point before polling.
+	// This is necessary because the search may not be operating on the
+	// current mesh grid.  This doesn't need to happen if search succeeds
+	// because search either always operates on the same grid, or always
+	// operates in continuous space.
+	m.SetOrigin(best.Pos())
 
 	success, best, nevalpoll, err = it.Poller.Poll(o, it.ev, m, it.curr)
 	n += nevalpoll
 	if err != nil {
 		return it.curr, n, err
 	} else if success {
+		it.curr = best
 		it.nsuccess++
-		it.nfail = 0
 		if it.nsuccess == it.NsuccessGrow { // == allows -1 to mean never grow
 			m.SetStep(m.Step() * 2.0)
 			it.nsuccess = 0 // reset after resize
 		}
-		m.SetOrigin(best.Pos()) // important to recenter mesh on new best point
-		it.curr = best
+
+		// Important to recenter mesh on new best point.  More particularly,
+		// the mesh may have been resized and the new best may not lie on the
+		// previous mesh grid.
+		m.SetOrigin(best.Pos())
+
 		return best, n, nil
 	} else {
 		it.nsuccess = 0
-		it.nfail++
 		var err error
-		if it.nfail == it.NfailShrink { // == allows -1 to mean never shrink
-			m.SetStep(m.Step() * 0.5)
-			it.nfail = 0 // reset after resize
-			if m.Step() == 0 {
-				err = ZeroStepErr
-			}
+		m.SetStep(m.Step() * 0.5)
+		if m.Step() == 0 {
+			err = ZeroStepErr
 		}
 		return it.curr, n, err
 	}
@@ -241,11 +237,11 @@ func (cp *CompassPoller) Poll(obj optim.Objectiver, ev optim.Evaler, m mesh.Mesh
 	if h != cp.prevhash || cp.prevstep != m.Step() {
 		// TODO: write test that checks we poll compass dirs again if only mesh
 		// step changed (and not from point)
-		pollpoints = append(pollpoints, genPollPoints(from, m)...)
+		pollpoints = append(pollpoints, genPollPoints(from, CompassNp1, m)...)
 		cp.prevhash = h
 	} else {
 		// Use random directions instead.
-		pollpoints = append(pollpoints, genRandPollPoints(from, m, 2*from.Len())...)
+		pollpoints = append(pollpoints, genPollPoints(from, Random2N, m)...)
 	}
 	cp.prevstep = m.Step()
 
@@ -343,19 +339,50 @@ func (s *ObjStopper) Objective(v []float64) (float64, error) {
 	return obj, nil
 }
 
-func genPollPoints(from optim.Point, m mesh.Mesh) []optim.Point {
+func genPollPoints(from optim.Point, span SpanFunc, m mesh.Mesh) []optim.Point {
 	ndim := from.Len()
-	polls := make([]optim.Point, 0, 2*ndim)
-	for i := 0; i < ndim; i++ {
-		d := make([]int, ndim)
-		d[i] = 1
-		polls = append(polls, pointFromDirec(from, d, m))
-
-		d = make([]int, ndim)
-		d[i] = -1
+	dirs := span(ndim)
+	polls := make([]optim.Point, 0, len(dirs))
+	for _, d := range dirs {
 		polls = append(polls, pointFromDirec(from, d, m))
 	}
 	return polls
+}
+
+// SpanFunc is returns a set of poll directions (maybe positive spanning set?)
+type SpanFunc func(ndim int) [][]int
+
+func Compass2N(ndim int) [][]int {
+	dirs := make([][]int, 0, 2*ndim)
+	for i := 0; i < ndim; i++ {
+		d := make([]int, ndim)
+		d[i] = 1
+		dirs = append(dirs, d)
+
+		d = make([]int, ndim)
+		d[i] = -1
+		dirs = append(dirs, d)
+	}
+	return dirs
+}
+
+func CompassNp1(ndim int) [][]int {
+	dirs := make([][]int, 0, ndim+1)
+	final := make([]int, ndim)
+	for i := 0; i < ndim; i++ {
+		d := make([]int, ndim)
+
+		r := optim.Rand.Intn(2)
+		d[i] = 1
+		final[i] = -1
+		if r == 0 {
+			d[i] = -1
+			final[i] = 1
+		}
+
+		dirs = append(dirs, d)
+	}
+	return append(dirs, final)
 }
 
 func pointFromDirec(from optim.Point, direc []int, m mesh.Mesh) optim.Point {
@@ -368,16 +395,18 @@ func pointFromDirec(from optim.Point, direc []int, m mesh.Mesh) optim.Point {
 	return optim.Nearest(p, m)
 }
 
-func genRandPollPoints(from optim.Point, m mesh.Mesh, n int) []optim.Point {
-	ndim := from.Len()
-	polls := make([]optim.Point, 0, n)
-	for len(polls) < n {
+// Random2N returns 2 * ndim random polling directions that exclude the
+// compass directions.
+func Random2N(ndim int) [][]int {
+	n := 2 * ndim
+	dirs := make([][]int, 0, n)
+	for len(dirs) < n {
 		d1 := make([]int, ndim)
 		d2 := make([]int, ndim)
 
 		nNonzero := 1
 		if ndim == 1 { // compass directions cover everything
-			return polls
+			return dirs
 		} else if ndim == 2 { // this check prevents calling Intn(0) - which is invalid
 			nNonzero = 2 // exclude compass directions
 		} else {
@@ -395,10 +424,10 @@ func genRandPollPoints(from optim.Point, m mesh.Mesh, n int) []optim.Point {
 				d2[perms[i]] = 1
 			}
 		}
-		polls = append(polls, pointFromDirec(from, d1, m))
-		polls = append(polls, pointFromDirec(from, d2, m))
+		dirs = append(dirs, d1)
+		dirs = append(dirs, d2)
 	}
-	return polls
+	return dirs
 }
 
 func pos2iface(pos []float64) []interface{} {

@@ -43,6 +43,12 @@ func (s *Solver) Niter() int  { return s.niter }
 func (s *Solver) Neval() int  { return s.neval }
 func (s *Solver) Err() error  { return s.err }
 
+func (s *Solver) Run() error {
+	for s.Next() {
+	}
+	return s.Err()
+}
+
 func (s *Solver) Next() (more bool) {
 	if s.niter == 0 {
 		s.best.Val = math.Inf(1)

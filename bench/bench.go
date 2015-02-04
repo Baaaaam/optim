@@ -7,9 +7,9 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"testing"
 
 	"github.com/rwcarlsen/optim"
-	"github.com/rwcarlsen/optim/mesh"
 )
 
 var (
@@ -40,6 +40,7 @@ type Func interface {
 	Eval(v []float64) float64
 	Bounds() (low, up []float64)
 	Optima() []optim.Point
+	Tol() float64
 	Name() string
 }
 
@@ -59,6 +60,8 @@ func (fn Ackley) Eval(v []float64) float64 {
 		20 + math.E
 }
 
+func (fn Ackley) Tol() float64 { return .01 }
+
 func (fn Ackley) Bounds() (low, up []float64) {
 	return []float64{-5, -5}, []float64{5, 5}
 }
@@ -72,6 +75,8 @@ func (fn Ackley) Optima() []optim.Point {
 type CrossTray struct{}
 
 func (fn CrossTray) Name() string { return "CrossTray" }
+
+func (fn CrossTray) Tol() float64 { return math.Abs(fn.Optima()[0].Val * .01) }
 
 func (fn CrossTray) Eval(v []float64) float64 {
 	if !InsideBounds(v, fn) {
@@ -100,6 +105,8 @@ type Eggholder struct{}
 
 func (fn Eggholder) Name() string { return "Eggholder" }
 
+func (fn Eggholder) Tol() float64 { return math.Abs(fn.Optima()[0].Val * .01) }
+
 func (fn Eggholder) Eval(v []float64) float64 {
 	if !InsideBounds(v, fn) {
 		return math.Inf(1)
@@ -123,6 +130,8 @@ func (fn Eggholder) Optima() []optim.Point {
 type HolderTable struct{}
 
 func (fn HolderTable) Name() string { return "HolderTable" }
+
+func (fn HolderTable) Tol() float64 { return math.Abs(fn.Optima()[0].Val * .01) }
 
 func (fn HolderTable) Eval(v []float64) float64 {
 	if !InsideBounds(v, fn) {
@@ -148,6 +157,8 @@ func (fn HolderTable) Optima() []optim.Point {
 }
 
 type Schaffer2 struct{}
+
+func (fn Schaffer2) Tol() float64 { return .01 }
 
 func (fn Schaffer2) Name() string { return "Schaffer2" }
 
@@ -176,6 +187,8 @@ type Styblinski struct {
 }
 
 func (fn Styblinski) Name() string { return fmt.Sprintf("Styblinski_%vD", fn.NDim) }
+
+func (fn Styblinski) Tol() float64 { return math.Abs(fn.Optima()[0].Val * .01) }
 
 func (fn Styblinski) Eval(x []float64) float64 {
 	if !InsideBounds(x, fn) {
@@ -215,6 +228,8 @@ type Rosenbrock struct {
 
 func (fn Rosenbrock) Name() string { return fmt.Sprintf("Rosenbrock_%vD", fn.NDim) }
 
+func (fn Rosenbrock) Tol() float64 { return float64(fn.NDim) }
+
 func (fn Rosenbrock) Eval(x []float64) float64 {
 	if !InsideBounds(x, fn) {
 		return math.Inf(1)
@@ -249,34 +264,16 @@ func (fn Rosenbrock) Optima() []optim.Point {
 	}
 }
 
-func Benchmark(it optim.Iterator, fn Func, tol float64, maxeval, maxiter int, discrete bool) (best optim.Point, niter, neval int, err error) {
-	obj := optim.Func(fn.Eval)
-	optimum := fn.Optima()[0].Val
-	thresh := tol * abs(optimum)
-	if optimum == 0 {
-		thresh = 0.01 * float64(fn.Optima()[0].Len())
+func Benchmark(t *testing.T, solv *optim.Solver, fn Func) {
+	err := solv.Run()
+	optim := fn.Optima()[0].Val
+	if err != nil {
+		t.Errorf("[ERROR:%v] %v", fn.Name(), err)
+	} else if v := solv.Best().Val; math.Abs(v-optim) > fn.Tol() {
+		t.Errorf("[FAIL:%v] %v evals (%v iter): want %v, got %v", fn.Name(), solv.Neval(), solv.Niter(), optim, v)
+	} else {
+		t.Logf("[pass:%v] %v evals (%v iter): want %v, got %v", fn.Name(), solv.Neval(), solv.Niter(), optim, v)
 	}
-
-	low, up := fn.Bounds()
-	max, min := up[0], low[0]
-
-	m := mesh.NewBounded(&mesh.Infinite{StepSize: (max - min) / 10}, low, up)
-	if !discrete {
-		m = mesh.NewBounded(&mesh.Infinite{StepSize: 0}, low, up)
-	}
-
-	for neval < maxeval && niter < maxiter {
-		var n int
-		best, n, err = it.Iterate(obj, m)
-		neval += n
-		niter++
-		if err != nil {
-			return best, niter, neval, err
-		} else if abs(optimum-best.Val) < thresh {
-			return best, niter, neval, nil
-		}
-	}
-	return best, niter, neval, ErrMax
 }
 
 var ErrMax = errors.New("hit max eval or iter limit")
