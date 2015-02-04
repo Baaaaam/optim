@@ -9,10 +9,22 @@ import (
 	"github.com/rwcarlsen/optim/mesh"
 )
 
+// Params chosen from:
+//
+//     Ioan Cristian Trelea, The particle swarm optimization algorithm:
+//     convergence analysis and parameter selection, Information Processing
+//     Letters, Volume 85, Issue 6, 31 March 2003, Pages 317-325, ISSN 0020-0190,
+//     http://dx.doi.org/10.1016/S0020-0190(02)00447-7.
+//
+// These params originate from work done by Clerc:
+//
+//     Clerc and M.  “The swarm and the queen: towards a deterministic and
+//     adaptive particle swarm optimization” Proc. 1999 Congress on Evolutionary
+//     Computation, pp. 1951-1957
 const (
-	DefaultCognition = 1.7
-	DefaultSocial    = 1.7
-	DefaultInertia   = 0.6
+	DefaultCognition = 1.494
+	DefaultSocial    = 1.494
+	DefaultInertia   = 0.729
 )
 
 const (
@@ -84,9 +96,26 @@ func (pop Population) Best() *Particle {
 
 type Option func(*Iterator)
 
-func Vmax(vel float64) Option {
+func Vmax(vmaxes []float64) Option {
 	return func(it *Iterator) {
-		it.Mover.Vmax = vel
+		it.Mover.Vmax = vmaxes
+	}
+}
+
+// VmaxBounds sets the maximum particle velocity for each dimension equal to
+// the bounded range for the problem - i.e. up[i]-low[i] for each dimension.
+// This is a good rule of thumb given in:
+//
+//     Eberhart, R.C.; Yuhui Shi, "Particle swarm optimization: developments,
+//     applications and resources," Evolutionary Computation, 2001. Proceedings of
+//     the 2001 Congress on , vol.1, no., pp.81,86 vol. 1, 2001 doi:
+//     10.1109/CEC.2001.934374
+func VmaxBounds(low, up []float64) Option {
+	return func(it *Iterator) {
+		it.Mover.Vmax = make([]float64, len(low))
+		for i := range it.Mover.Vmax {
+			it.Mover.Vmax[i] = up[i] - low[i]
+		}
 	}
 }
 
@@ -109,6 +138,14 @@ func VelUpdParams(cognition, social float64) Option {
 	}
 }
 
+// LinInertia sets particle inertia for velocity updates to varry linearly
+// from the start (high) to end (low) values from 0 to maxiter.  Common values
+// are start = 0.9 and end = 0.4 - for details see:
+//
+// Eberhart, R.C.; Yuhui Shi, "Particle swarm optimization: developments,
+// applications and resources," Evolutionary Computation, 2001. Proceedings of
+// the 2001 Congress on , vol.1, no., pp.81,86 vol. 1, 2001 doi:
+// 10.1109/CEC.2001.934374
 func LinInertia(start, end float64, maxiter int) Option {
 	return func(it *Iterator) {
 		it.Mover.InertiaFn = func(iter int) float64 {
@@ -269,9 +306,9 @@ func (it *Iterator) updateDb() {
 type Mover struct {
 	Cognition float64
 	Social    float64
-	// Vmax is the speed limit for particles.  If not specified,
-	// Vmax=1.5*currVel.
-	Vmax      float64
+	// Vmax is the speed limit in each dimension for particles.  If nil,
+	// infinity is used.
+	Vmax      []float64
 	InertiaFn func(int) float64
 	iter      int
 }
@@ -292,14 +329,7 @@ func (mv *Mover) Move(best optim.Point, pop Population) {
 			p.Vel[i] = mv.InertiaFn(mv.iter)*currv +
 				mv.Cognition*w1*(p.Best.At(i)-p.At(i)) +
 				mv.Social*w2*(best.At(i)-p.At(i))
-		}
-
-		if mv.Vmax > 0 {
-			if s := Speed(p.Vel); s > mv.Vmax {
-				for i := range p.Vel {
-					p.Vel[i] *= mv.Vmax / s
-				}
-			}
+			p.Vel[i] = math.Min(p.Vel[i], mv.Vmax[i])
 		}
 
 		// update position
@@ -309,14 +339,6 @@ func (mv *Mover) Move(best optim.Point, pop Population) {
 		}
 		p.Point = optim.NewPoint(pos, math.Inf(1))
 	}
-}
-
-func Speed(vel []float64) float64 {
-	tot := 0.0
-	for _, v := range vel {
-		tot += v * v
-	}
-	return math.Sqrt(tot)
 }
 
 // TODO: remove all uses of this

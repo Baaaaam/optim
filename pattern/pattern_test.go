@@ -52,13 +52,11 @@ func TestCompass(t *testing.T) {
 		optimum := fn.Optima()[0].Val
 		it := buildIter(fn, nil)
 
-		best, _, n, err := bench.Benchmark(it, fn, .01, maxeval, maxiter, true)
+		best, niter, n, err := bench.Benchmark(it, fn, .01, maxeval, maxiter, true)
 		if err != nil {
-			t.Errorf("[FAIL:%v] %v evals: optimum is %v, got %v. %v", fn.Name(), n, optimum, best.Val, err)
-		} else if n < maxeval {
-			t.Logf("[pass:%v] %v evals: optimum is %v, got %v", fn.Name(), n, optimum, best.Val)
+			t.Errorf("[FAIL:%v] %v evals (%v iter): optimum is %v, got %v", fn.Name(), n, niter, optimum, best.Val)
 		} else {
-			t.Errorf("[FAIL:%v] %v evals: optimum is %v, got %v", fn.Name(), n, optimum, best.Val)
+			t.Logf("[pass:%v] %v evals (%v iter): optimum is %v, got %v", fn.Name(), n, niter, optimum, best.Val)
 		}
 	}
 }
@@ -66,42 +64,38 @@ func TestCompass(t *testing.T) {
 func TestHybridNocache(t *testing.T) {
 	for _, fn := range bench.AllFuncs {
 		optimum := fn.Optima()[0].Val
-		it := buildHybrid(fn, false)
+		it := buildHybrid(fn, false, nil)
 
-		best, _, n, err := bench.Benchmark(it, fn, .01, maxeval, maxiter, true)
+		best, niter, n, err := bench.Benchmark(it, fn, .01, maxeval, maxiter, true)
 		if err != nil {
-			t.Errorf("[FAIL:%v] %v evals: optimum is %v, got %v. %v", fn.Name(), n, optimum, best.Val, err)
-		} else if n < maxeval {
-			t.Logf("[pass:%v] %v evals: optimum is %v, got %v", fn.Name(), n, optimum, best.Val)
+			t.Errorf("[FAIL:%v] %v evals (%v iter): optimum is %v, got %v", fn.Name(), n, niter, optimum, best.Val)
 		} else {
-			t.Errorf("[FAIL:%v] %v evals: optimum is %v, got %v", fn.Name(), n, optimum, best.Val)
+			t.Logf("[pass:%v] %v evals (%v iter): optimum is %v, got %v", fn.Name(), n, niter, optimum, best.Val)
 		}
 	}
 }
 
 func TestHybridCache(t *testing.T) {
-	//funcs := []bench.Func{bench.Rosenbrock{30}}
 	for _, fn := range bench.AllFuncs {
 		optimum := fn.Optima()[0].Val
-		it := buildHybrid(fn, true)
+		it := buildHybrid(fn, true, nil)
 
 		best, niter, n, err := bench.Benchmark(it, fn, .01, maxeval, maxiter, true)
 		if err != nil {
-			t.Errorf("[FAIL:%v] %v evals (%v iter): optimum is %v, got %v. %v", fn.Name(), n, niter, optimum, best.Val, err)
-		} else if n < maxeval {
-			t.Logf("[pass:%v] %v evals (%v iter): optimum is %v, got %v", fn.Name(), n, niter, optimum, best.Val)
-		} else {
 			t.Errorf("[FAIL:%v] %v evals (%v iter): optimum is %v, got %v", fn.Name(), n, niter, optimum, best.Val)
+		} else {
+			t.Logf("[pass:%v] %v evals (%v iter): optimum is %v, got %v", fn.Name(), n, niter, optimum, best.Val)
 		}
 	}
 }
 
 func buildIter(fn bench.Func, db *sql.DB) optim.Iterator {
-	start := initialpoint(fn.Bounds())
+	start := initialpoint(fn)
 	return NewIterator(nil, start, DB(db))
 }
 
-func initialpoint(low, up []float64) optim.Point {
+func initialpoint(fn bench.Func) optim.Point {
+	low, up := fn.Bounds()
 	max, min := up[0], low[0]
 	pos := make([]float64, len(low))
 	for i := range low {
@@ -110,37 +104,42 @@ func initialpoint(low, up []float64) optim.Point {
 	return optim.NewPoint(pos, math.Inf(1))
 }
 
-func buildHybrid(fn bench.Func, cache bool) optim.Iterator {
-	//optim.Rand = rand.New(rand.NewSource(time.Now().Unix()))
-
-	start := initialpoint(fn.Bounds())
-
+func initialPop(fn bench.Func) pswarm.Population {
 	low, up := fn.Bounds()
-	var ev optim.Evaler = optim.SerialEvaler{}
-	if cache {
-		ev = optim.NewCacheEvaler(optim.SerialEvaler{})
-	}
-
-	// generate initial points
 	minv := make([]float64, len(up))
 	maxv := make([]float64, len(up))
 	for i := range up {
-		minv[i] = (up[i] - low[i]) / 10
+		minv[i] = (up[i] - low[i]) / 2
 		maxv[i] = minv[i] * 2
 	}
 
-	n := 30 + 3*len(low)
+	n := 30 + 7*len(low)
 	if n > maxeval/150 {
 		n = maxeval / 150
 	}
 	points := pop.New(n, low, up)
+	return pswarm.NewPopulation(points, minv, maxv)
+}
 
-	// configure solver
-	pop := pswarm.NewPopulation(points, minv, maxv)
+func buildHybrid(fn bench.Func, cache bool, db *sql.DB) optim.Iterator {
+	//optim.Rand = rand.New(rand.NewSource(time.Now().Unix()))
+
+	var ev optim.Evaler = optim.SerialEvaler{}
+	if cache {
+		ev = optim.NewCacheEvaler(optim.SerialEvaler{})
+	}
+	start := initialpoint(fn)
+
+	pop := initialPop(fn)
 	swarm := pswarm.NewIterator(ev, nil, pop,
-		pswarm.LinInertia(0.9, 0.4, maxeval/n),
+		//pswarm.KillDist(10000),
+		pswarm.VmaxBounds(fn.Bounds()),
+		//pswarm.LinInertia(0.9, 0.4, maxeval/len(pop)),
+		pswarm.DB(db),
 	)
-	return NewIterator(ev, start, SearchIter(swarm),
+	return NewIterator(ev, start,
+		SearchIter(swarm),
 		ContinuousSearch,
+		DB(db),
 	)
 }

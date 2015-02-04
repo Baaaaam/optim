@@ -19,20 +19,6 @@ const (
 	TblInfo  = "patterninfo"
 )
 
-type Iterator struct {
-	ev               optim.Evaler
-	Poller           Poller
-	Searcher         Searcher
-	curr             optim.Point
-	ContinuousSearch bool // true to not project search points onto poll step size mesh
-	NsuccessGrow     int  // number of successive successful polls before growing mesh
-	NfailShrink      int  // number of successive failed polls before shrinking mesh
-	nsuccess         int  // (internal) number of successive successful polls
-	nfail            int  // (internal) number of successive failed polls
-	Db               *sql.DB
-	count            int
-}
-
 type Option func(*Iterator)
 
 func NsuccessGrow(n int) Option {
@@ -63,6 +49,20 @@ func DB(db *sql.DB) Option {
 	}
 }
 
+type Iterator struct {
+	ev               optim.Evaler
+	Poller           Poller
+	Searcher         Searcher
+	curr             optim.Point
+	ContinuousSearch bool // true to not project search points onto poll step size mesh
+	NsuccessGrow     int  // number of successive successful polls before growing mesh
+	NfailShrink      int  // number of successive failed polls before shrinking mesh
+	nsuccess         int  // (internal) number of successive successful polls
+	nfail            int  // (internal) number of successive failed polls
+	Db               *sql.DB
+	count            int
+}
+
 func NewIterator(e optim.Evaler, start optim.Point, opts ...Option) *Iterator {
 	if e == nil {
 		e = optim.SerialEvaler{}
@@ -70,7 +70,7 @@ func NewIterator(e optim.Evaler, start optim.Point, opts ...Option) *Iterator {
 	it := &Iterator{
 		curr:         start,
 		ev:           e,
-		Poller:       &CompassPoller{Nrandom: start.Len() * 2, Nkeep: start.Len()},
+		Poller:       &CompassPoller{Nkeep: start.Len()},
 		Searcher:     NullSearcher{},
 		NfailShrink:  1,
 		NsuccessGrow: 2,
@@ -163,6 +163,7 @@ func (it *Iterator) Iterate(o optim.Objectiver, m mesh.Mesh) (best optim.Point, 
 	if it.ContinuousSearch {
 		m.SetStep(0)
 	}
+
 	success, best, nevalsearch, err = it.Searcher.Search(o, m, it.curr)
 	m.SetStep(prevstep)
 
@@ -218,9 +219,6 @@ type Poller interface {
 }
 
 type CompassPoller struct {
-	// Nrandom specifies the number of random-direction chosen points to
-	// include in addition to the compass direction points on each poll.
-	Nrandom int
 	// Nkeep specifies the number of previous successful poll directions to
 	// reuse on the next poll. The number of reused directions is min(Nkeep,
 	// nsuccessful).
@@ -250,8 +248,6 @@ func (cp *CompassPoller) Poll(obj optim.Objectiver, ev optim.Evaler, m mesh.Mesh
 		pollpoints = append(pollpoints, genRandPollPoints(from, m, 2*from.Len())...)
 	}
 	cp.prevstep = m.Step()
-
-	pollpoints = append(pollpoints, genRandPollPoints(from, m, cp.Nrandom)...)
 
 	// Add successful directions from last poll.
 	for _, dir := range cp.keepdirecs {
@@ -308,10 +304,15 @@ func (_ NullSearcher) Search(o optim.Objectiver, m mesh.Mesh, curr optim.Point) 
 
 type WrapSearcher struct {
 	Iter optim.Iterator
+	// AddCurr specifies whether to add the current best point to the
+	// searcher's underlying Iterator before performing the search.
+	AddCurr bool
 }
 
 func (s *WrapSearcher) Search(o optim.Objectiver, m mesh.Mesh, curr optim.Point) (success bool, best optim.Point, n int, err error) {
-	s.Iter.AddPoint(curr)
+	if s.AddCurr {
+		s.Iter.AddPoint(curr)
+	}
 	best, n, err = s.Iter.Iterate(o, m)
 	if err != nil {
 		return false, optim.Point{}, n, err
@@ -319,6 +320,8 @@ func (s *WrapSearcher) Search(o optim.Objectiver, m mesh.Mesh, curr optim.Point)
 	if best.Val < curr.Val {
 		return true, best, n, nil
 	}
+	// TODO: write test that checks we return curr instead of best for search
+	// fail.
 	return false, curr, n, nil
 }
 

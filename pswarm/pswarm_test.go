@@ -68,7 +68,7 @@ func buildIter(fn bench.Func, db *sql.DB) *Iterator {
 	minv := make([]float64, len(up))
 	maxv := make([]float64, len(up))
 	for i := range up {
-		minv[i] = (up[i] - low[i]) / 10
+		minv[i] = (up[i] - low[i]) / 2
 		maxv[i] = minv[i] * 2
 	}
 
@@ -80,8 +80,8 @@ func buildIter(fn bench.Func, db *sql.DB) *Iterator {
 	points := pop.New(n, low, up)
 	pop := NewPopulation(points, minv, maxv)
 	return NewIterator(nil, nil, pop,
+		VmaxBounds(low, up),
 		DB(db),
-		LinInertia(0.9, 0.4, maxeval/n),
 	)
 
 }

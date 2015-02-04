@@ -260,7 +260,7 @@ func Benchmark(it optim.Iterator, fn Func, tol float64, maxeval, maxiter int, di
 	low, up := fn.Bounds()
 	max, min := up[0], low[0]
 
-	m := mesh.NewBounded(&mesh.Infinite{StepSize: (max - min) / 5}, low, up)
+	m := mesh.NewBounded(&mesh.Infinite{StepSize: (max - min) / 10}, low, up)
 	if !discrete {
 		m = mesh.NewBounded(&mesh.Infinite{StepSize: 0}, low, up)
 	}
