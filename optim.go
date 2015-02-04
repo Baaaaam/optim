@@ -23,6 +23,9 @@ type Rng interface {
 
 func RandFloat() float64 { return Rand.Float64() }
 
+//StopFunc is used to terminate a solver by returning true.
+type StopFunc func(s *Solver) bool
+
 type Solver struct {
 	Iter         Iterator
 	Obj          Objectiver
@@ -31,6 +34,7 @@ type Solver struct {
 	MaxEval      int
 	MaxNoImprove int
 	MinStep      float64
+	Stop         StopFunc
 
 	neval, niter int
 	noimprove    int
@@ -68,6 +72,10 @@ func (s *Solver) Next() (more bool) {
 	}
 
 	if s.err != nil {
+		return false
+	}
+
+	if s.Stop != nil && s.Stop(s) {
 		return false
 	}
 

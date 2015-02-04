@@ -40,6 +40,8 @@ type Func interface {
 	Eval(v []float64) float64
 	Bounds() (low, up []float64)
 	Optima() []optim.Point
+	// Tol returns a value below which the Func is considered
+	// optimized/solved.
 	Tol() float64
 	Name() string
 }
@@ -76,7 +78,7 @@ type CrossTray struct{}
 
 func (fn CrossTray) Name() string { return "CrossTray" }
 
-func (fn CrossTray) Tol() float64 { return math.Abs(fn.Optima()[0].Val * .01) }
+func (fn CrossTray) Tol() float64 { return fn.Optima()[0].Val + math.Abs(fn.Optima()[0].Val*.01) }
 
 func (fn CrossTray) Eval(v []float64) float64 {
 	if !InsideBounds(v, fn) {
@@ -105,7 +107,7 @@ type Eggholder struct{}
 
 func (fn Eggholder) Name() string { return "Eggholder" }
 
-func (fn Eggholder) Tol() float64 { return math.Abs(fn.Optima()[0].Val * .01) }
+func (fn Eggholder) Tol() float64 { return fn.Optima()[0].Val + math.Abs(fn.Optima()[0].Val*.01) }
 
 func (fn Eggholder) Eval(v []float64) float64 {
 	if !InsideBounds(v, fn) {
@@ -131,7 +133,7 @@ type HolderTable struct{}
 
 func (fn HolderTable) Name() string { return "HolderTable" }
 
-func (fn HolderTable) Tol() float64 { return math.Abs(fn.Optima()[0].Val * .01) }
+func (fn HolderTable) Tol() float64 { return fn.Optima()[0].Val + math.Abs(fn.Optima()[0].Val*.01) }
 
 func (fn HolderTable) Eval(v []float64) float64 {
 	if !InsideBounds(v, fn) {
@@ -188,7 +190,7 @@ type Styblinski struct {
 
 func (fn Styblinski) Name() string { return fmt.Sprintf("Styblinski_%vD", fn.NDim) }
 
-func (fn Styblinski) Tol() float64 { return math.Abs(fn.Optima()[0].Val * .01) }
+func (fn Styblinski) Tol() float64 { return fn.Optima()[0].Val + math.Abs(fn.Optima()[0].Val*.01) }
 
 func (fn Styblinski) Eval(x []float64) float64 {
 	if !InsideBounds(x, fn) {
@@ -265,14 +267,17 @@ func (fn Rosenbrock) Optima() []optim.Point {
 }
 
 func Benchmark(t *testing.T, solv *optim.Solver, fn Func) {
+	solv.Stop = func(s *optim.Solver) bool {
+		return s.Best().Val < fn.Tol()
+	}
 	err := solv.Run()
 	optim := fn.Optima()[0].Val
 	if err != nil {
 		t.Errorf("[ERROR:%v] %v", fn.Name(), err)
-	} else if v := solv.Best().Val; math.Abs(v-optim) > fn.Tol() {
-		t.Errorf("[FAIL:%v] %v evals (%v iter): want %v, got %v", fn.Name(), solv.Neval(), solv.Niter(), optim, v)
-	} else {
+	} else if v := solv.Best().Val; v < fn.Tol() {
 		t.Logf("[pass:%v] %v evals (%v iter): want %v, got %v", fn.Name(), solv.Neval(), solv.Niter(), optim, v)
+	} else {
+		t.Errorf("[FAIL:%v] %v evals (%v iter): want %v, got %v", fn.Name(), solv.Neval(), solv.Niter(), optim, v)
 	}
 }
 

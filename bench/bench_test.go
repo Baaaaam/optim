@@ -27,7 +27,8 @@ const (
 
 func TestPattern(t *testing.T) {
 	for _, fn := range AllFuncs {
-		it, m := patternsolver(fn, nil)
+		db, _ := sql.Open("sqlite3", fn.Name()+".sqlite")
+		it, m := patternsolver(fn, db)
 		solv := &optim.Solver{
 			Iter:         it,
 			Obj:          optim.Func(fn.Eval),
@@ -93,6 +94,18 @@ func TestPSwarmCache(t *testing.T) {
 	}
 }
 
+func patternsolver(fn Func, db *sql.DB) (optim.Iterator, mesh.Mesh) {
+	low, up := fn.Bounds()
+	max, min := up[0], low[0]
+	m := mesh.NewBounded(&mesh.Infinite{StepSize: (max - min) / 10}, low, up)
+
+	p := initialpoint(fn)
+	m.SetOrigin(p.Pos())
+
+	it := pattern.NewIterator(nil, p, pattern.DB(db))
+	return it, m
+}
+
 func swarmsolver(fn Func, db *sql.DB) (optim.Iterator, mesh.Mesh) {
 	low, up := fn.Bounds()
 	m := mesh.NewBounded(&mesh.Infinite{StepSize: 0}, low, up)
@@ -107,14 +120,6 @@ func swarmsolver(fn Func, db *sql.DB) (optim.Iterator, mesh.Mesh) {
 		pswarm.VmaxBounds(fn.Bounds()),
 		pswarm.DB(db),
 	)
-	return it, m
-}
-
-func patternsolver(fn Func, db *sql.DB) (optim.Iterator, mesh.Mesh) {
-	low, up := fn.Bounds()
-	max, min := up[0], low[0]
-	m := mesh.NewBounded(&mesh.Infinite{StepSize: (max - min) / 10}, low, up)
-	it := pattern.NewIterator(nil, initialpoint(fn), pattern.DB(db))
 	return it, m
 }
 
@@ -138,7 +143,11 @@ func pswarmsolver(fn Func, db *sql.DB, cache bool) (optim.Iterator, mesh.Mesh) {
 		pswarm.VmaxBounds(fn.Bounds()),
 		pswarm.DB(db),
 	)
-	it := pattern.NewIterator(ev, initialpoint(fn),
+
+	p := initialpoint(fn)
+	m.SetOrigin(p.Pos())
+
+	it := pattern.NewIterator(ev, p,
 		pattern.SearchIter(swarm),
 		pattern.ContinuousSearch,
 		pattern.DB(db),
