@@ -10,9 +10,9 @@ import (
 )
 
 const (
-	DefaultCognition = 1.5
-	DefaultSocial    = 1.5
-	DefaultInertia   = 0.9
+	DefaultCognition = 1.7
+	DefaultSocial    = 1.7
+	DefaultInertia   = 0.6
 )
 
 const (
@@ -28,8 +28,10 @@ type Particle struct {
 }
 
 func (p *Particle) Update(newp optim.Point) {
+	// DO NOT update p's position with newp's position - it may have been
+	// projected onto a mesh and be different.
 	p.Val = newp.Val
-	if p.Val < p.Best.Val || p.Best.Len() == 0 {
+	if p.Val < p.Best.Val {
 		p.Best = newp
 	}
 }
@@ -71,8 +73,9 @@ func (pop Population) Best() *Particle {
 
 	best := pop[0]
 	for _, p := range pop[1:] {
-		// TODO: write test to make sure this checks p.Best.Val instead of p.Val.
-		if p.Best.Val < best.Val {
+		// TODO: write test to make sure this checks p.Best.Val < best.Best.Val
+		// and NOT p.Val or best.Val.
+		if p.Best.Val < best.Best.Val {
 			best = p
 		}
 	}
@@ -135,11 +138,10 @@ func NewIterator(e optim.Evaler, m *Mover, pop Population, opts ...Option) *Iter
 		m = &Mover{Cognition: DefaultCognition, Social: DefaultSocial}
 	}
 	it := &Iterator{
-		Pop:      pop,
-		Evaler:   e,
-		Mover:    m,
-		best:     pop.Best().Point,
-		KillDist: math.Inf(1),
+		Pop:    pop,
+		Evaler: e,
+		Mover:  m,
+		best:   pop.Best().Point,
 	}
 
 	for _, opt := range opts {
@@ -166,7 +168,7 @@ func (it *Iterator) Iterate(obj optim.Objectiver, m mesh.Mesh) (best optim.Point
 	}
 	results, n, err := it.Evaler.Eval(obj, points...)
 	if err != nil {
-		return optim.Point{}, n, err
+		return optim.Point{Val: math.Inf(1)}, n, err
 	}
 
 	for i := range results {
@@ -283,13 +285,6 @@ func (mv *Mover) Move(best optim.Point, pop Population) {
 	}
 
 	for _, p := range pop {
-		vmax := mv.Vmax
-		if mv.Vmax == 0 {
-			// if no vmax is given, use 1.5 * current speed
-			//vmax = 1.5 * Speed(p.Vel)
-			vmax = math.Inf(1)
-		}
-
 		w1 := optim.RandFloat()
 		w2 := optim.RandFloat()
 		// update velocity
@@ -297,12 +292,14 @@ func (mv *Mover) Move(best optim.Point, pop Population) {
 			p.Vel[i] = mv.InertiaFn(mv.iter)*currv +
 				mv.Cognition*w1*(p.Best.At(i)-p.At(i)) +
 				mv.Social*w2*(best.At(i)-p.At(i))
-			if s := Speed(p.Vel); s > vmax {
+		}
+
+		if mv.Vmax > 0 {
+			if s := Speed(p.Vel); s > mv.Vmax {
 				for i := range p.Vel {
-					p.Vel[i] *= vmax / s
+					p.Vel[i] *= mv.Vmax / s
 				}
 			}
-
 		}
 
 		// update position

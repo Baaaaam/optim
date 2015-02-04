@@ -4,6 +4,7 @@
 package bench
 
 import (
+	"errors"
 	"fmt"
 	"math"
 
@@ -232,8 +233,8 @@ func (fn Rosenbrock) Bounds() (low, up []float64) {
 	low = make([]float64, fn.NDim)
 	up = make([]float64, fn.NDim)
 	for i := range low {
-		low[i] = -1000
-		up[i] = 1000
+		low[i] = -30
+		up[i] = 30
 	}
 	return low, up
 }
@@ -248,7 +249,7 @@ func (fn Rosenbrock) Optima() []optim.Point {
 	}
 }
 
-func Benchmark(it optim.Iterator, fn Func, tol float64, maxeval int) (best optim.Point, niter, neval int, err error) {
+func Benchmark(it optim.Iterator, fn Func, tol float64, maxeval, maxiter int, discrete bool) (best optim.Point, niter, neval int, err error) {
 	obj := optim.Func(fn.Eval)
 	optimum := fn.Optima()[0].Val
 	thresh := tol * abs(optimum)
@@ -258,9 +259,13 @@ func Benchmark(it optim.Iterator, fn Func, tol float64, maxeval int) (best optim
 
 	low, up := fn.Bounds()
 	max, min := up[0], low[0]
-	m := mesh.NewBounded(&mesh.Infinite{StepSize: (max - min) / 5}, low, up)
 
-	for neval < maxeval {
+	m := mesh.NewBounded(&mesh.Infinite{StepSize: (max - min) / 5}, low, up)
+	if !discrete {
+		m = mesh.NewBounded(&mesh.Infinite{StepSize: 0}, low, up)
+	}
+
+	for neval < maxeval && niter < maxiter {
 		var n int
 		best, n, err = it.Iterate(obj, m)
 		neval += n
@@ -271,8 +276,10 @@ func Benchmark(it optim.Iterator, fn Func, tol float64, maxeval int) (best optim
 			return best, niter, neval, nil
 		}
 	}
-	return best, niter, neval, nil
+	return best, niter, neval, ErrMax
 }
+
+var ErrMax = errors.New("hit max eval or iter limit")
 
 func InsideBounds(p []float64, fn Func) bool {
 	low, up := fn.Bounds()

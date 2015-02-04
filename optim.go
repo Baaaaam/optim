@@ -92,7 +92,7 @@ func (p Point) Clone() Point { return NewPoint(p.pos, p.Val) }
 func (p Point) Hash() [sha1.Size]byte {
 	data := make([]byte, p.Len()*8)
 	for i := 0; i < p.Len(); i++ {
-		binary.BigEndian.PutUint64(data[i*8:], math.Float64bits(p.At(i)))
+		binary.BigEndian.PutUint64(data[i*8:], math.Float64bits(p.pos[i]))
 	}
 	return sha1.Sum(data)
 }

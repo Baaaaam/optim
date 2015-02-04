@@ -10,6 +10,7 @@ import (
 )
 
 const maxeval = 10000
+const maxiter = 1000
 
 func TestDb(t *testing.T) {
 	db, err := sql.Open("sqlite3", ":memory:")
@@ -22,7 +23,11 @@ func TestDb(t *testing.T) {
 	optimum := fn.Optima()[0].Val
 	it := buildIter(fn, db)
 
-	best, _, neval, err := bench.Benchmark(it, fn, .01, maxeval)
+	best, _, neval, err := bench.Benchmark(it, fn, .01, maxeval, maxiter, false)
+	if err != nil {
+		t.Errorf("[ERROR] %v", err)
+	}
+
 	t.Logf("[INFO] %v evals: optimum is %v, got %v", neval, optimum, best.Val)
 
 	var count int
@@ -43,17 +48,17 @@ func TestDb(t *testing.T) {
 }
 
 func TestSimple(t *testing.T) {
+	//for _, fn := range []bench.Func{bench.Rosenbrock{2}} {
 	for _, fn := range bench.AllFuncs {
+		//db, _ := sql.Open("sqlite3", fn.Name()+"new.sqlite")
 		optimum := fn.Optima()[0].Val
 		it := buildIter(fn, nil)
 
-		best, niter, neval, err := bench.Benchmark(it, fn, .01, maxeval)
+		best, niter, neval, err := bench.Benchmark(it, fn, .01, maxeval, maxiter, false)
 		if err != nil {
-			t.Errorf("[FAIL:%v] %v evals (%v iter): optimum is %v, got %v. %v", fn.Name(), neval, niter, optimum, best.Val, err)
+			t.Errorf("[FAIL:%v] %v evals (%v iter): optimum is %v, got %v", fn.Name(), neval, niter, optimum, best.Val)
 		} else if neval < maxeval {
 			t.Logf("[pass:%v] %v evals (%v iter): optimum is %v, got %v", fn.Name(), neval, niter, optimum, best.Val)
-		} else {
-			t.Errorf("[FAIL:%v] %v evals (%v iter): optimum is %v, got %v", fn.Name(), neval, niter, optimum, best.Val)
 		}
 	}
 }
@@ -63,18 +68,20 @@ func buildIter(fn bench.Func, db *sql.DB) *Iterator {
 	minv := make([]float64, len(up))
 	maxv := make([]float64, len(up))
 	for i := range up {
-		minv[i] = (up[i] - low[i]) / 6
-		maxv[i] = minv[i] * 1.7
+		minv[i] = (up[i] - low[i]) / 10
+		maxv[i] = minv[i] * 2
 	}
 
-	n := 10 + 7*len(low)
-	if n > maxeval/110 {
-		n = maxeval / 110
+	n := 30 + 1*len(low)
+	if n > maxeval/150 {
+		n = maxeval / 150
 	}
 
 	points := pop.New(n, low, up)
 	pop := NewPopulation(points, minv, maxv)
 	return NewIterator(nil, nil, pop,
-		LinInertia(0.9, 0.4, maxeval/n), DB(db),
+		DB(db),
+		LinInertia(0.9, 0.4, maxeval/n),
 	)
+
 }

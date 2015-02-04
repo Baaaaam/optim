@@ -14,6 +14,7 @@ import (
 )
 
 const maxeval = 50000
+const maxiter = 1000
 
 func TestDb(t *testing.T) {
 	db, err := sql.Open("sqlite3", ":memory:")
@@ -26,7 +27,7 @@ func TestDb(t *testing.T) {
 	optimum := fn.Optima()[0].Val
 	it := buildIter(fn, db)
 
-	best, _, neval, err := bench.Benchmark(it, fn, .01, maxeval)
+	best, _, neval, err := bench.Benchmark(it, fn, .01, maxeval, maxiter, true)
 	t.Logf("[INFO] %v evals: optimum is %v, got %v", neval, optimum, best.Val)
 
 	var count int
@@ -51,7 +52,7 @@ func TestCompass(t *testing.T) {
 		optimum := fn.Optima()[0].Val
 		it := buildIter(fn, nil)
 
-		best, _, n, err := bench.Benchmark(it, fn, .01, maxeval)
+		best, _, n, err := bench.Benchmark(it, fn, .01, maxeval, maxiter, true)
 		if err != nil {
 			t.Errorf("[FAIL:%v] %v evals: optimum is %v, got %v. %v", fn.Name(), n, optimum, best.Val, err)
 		} else if n < maxeval {
@@ -67,7 +68,7 @@ func TestHybridNocache(t *testing.T) {
 		optimum := fn.Optima()[0].Val
 		it := buildHybrid(fn, false)
 
-		best, _, n, err := bench.Benchmark(it, fn, .01, maxeval)
+		best, _, n, err := bench.Benchmark(it, fn, .01, maxeval, maxiter, true)
 		if err != nil {
 			t.Errorf("[FAIL:%v] %v evals: optimum is %v, got %v. %v", fn.Name(), n, optimum, best.Val, err)
 		} else if n < maxeval {
@@ -79,13 +80,12 @@ func TestHybridNocache(t *testing.T) {
 }
 
 func TestHybridCache(t *testing.T) {
-	funcs := bench.AllFuncs
-	//funcs := []bench.Func{bench.Eggholder{}}
-	for _, fn := range funcs {
+	//funcs := []bench.Func{bench.Rosenbrock{30}}
+	for _, fn := range bench.AllFuncs {
 		optimum := fn.Optima()[0].Val
 		it := buildHybrid(fn, true)
 
-		best, niter, n, err := bench.Benchmark(it, fn, .01, maxeval)
+		best, niter, n, err := bench.Benchmark(it, fn, .01, maxeval, maxiter, true)
 		if err != nil {
 			t.Errorf("[FAIL:%v] %v evals (%v iter): optimum is %v, got %v. %v", fn.Name(), n, niter, optimum, best.Val, err)
 		} else if n < maxeval {
@@ -112,32 +112,26 @@ func initialpoint(low, up []float64) optim.Point {
 
 func buildHybrid(fn bench.Func, cache bool) optim.Iterator {
 	//optim.Rand = rand.New(rand.NewSource(time.Now().Unix()))
-	//os.Remove("hybrid.sqlite")
-	//db, _ := sql.Open("sqlite3", "hybrid.sqlite")
 
 	start := initialpoint(fn.Bounds())
 
 	low, up := fn.Bounds()
 	var ev optim.Evaler = optim.SerialEvaler{}
 	if cache {
-		//ev = optim.NewCacheEvaler(optim.ParallelEvaler{})
 		ev = optim.NewCacheEvaler(optim.SerialEvaler{})
 	}
 
 	// generate initial points
 	minv := make([]float64, len(up))
 	maxv := make([]float64, len(up))
-	maxmaxv := 0.0
 	for i := range up {
-		minv[i] = (up[i] - low[i]) / 20
-		maxv[i] = minv[i] * 4
-		maxmaxv += maxv[i] * maxv[i]
+		minv[i] = (up[i] - low[i]) / 10
+		maxv[i] = minv[i] * 2
 	}
-	maxmaxv = math.Sqrt(maxmaxv)
 
-	n := 10 + 7*len(low)
-	if n > maxeval/120 {
-		n = maxeval / 120
+	n := 30 + 3*len(low)
+	if n > maxeval/150 {
+		n = maxeval / 150
 	}
 	points := pop.New(n, low, up)
 
@@ -145,12 +139,8 @@ func buildHybrid(fn bench.Func, cache bool) optim.Iterator {
 	pop := pswarm.NewPopulation(points, minv, maxv)
 	swarm := pswarm.NewIterator(ev, nil, pop,
 		pswarm.LinInertia(0.9, 0.4, maxeval/n),
-		pswarm.Vmax(maxmaxv),
-		pswarm.VelUpdParams(.5, .5),
-		//pswarm.DB(db),
 	)
 	return NewIterator(ev, start, SearchIter(swarm),
-		//DB(db),
 		ContinuousSearch,
 	)
 }
