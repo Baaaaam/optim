@@ -110,6 +110,8 @@ func NewPopulation(points []optim.Point, minv, maxv []float64) Population {
 	return pop
 }
 
+// NewPopulationRand creates a population of randomly positioned particles
+// uniformly distributed in the box-bounds described by low and up.
 func NewPopulationRand(n int, low, up []float64) Population {
 	minv := make([]float64, len(up))
 	maxv := make([]float64, len(up))
@@ -166,7 +168,7 @@ func VmaxBounds(low, up []float64) Option {
 	return func(it *Iterator) {
 		it.Vmax = make([]float64, len(low))
 		for i := range it.Vmax {
-			it.Vmax[i] = up[i] - low[i]
+			it.Vmax[i] = (up[i] - low[i])
 		}
 	}
 }
@@ -222,7 +224,7 @@ type Iterator struct {
 	Cognition float64
 	Social    float64
 	InertiaFn func(iter int) float64
-	// Vmax is the speed limit in each dimension for particles.  If nil,
+	// Vmax is the speed limit per dimension for particles.  If nil,
 	// infinity is used.
 	Vmax  []float64
 	Db    *sql.DB

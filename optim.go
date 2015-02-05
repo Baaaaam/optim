@@ -203,6 +203,8 @@ func (ev SerialEvaler) Eval(obj Objectiver, points ...Point) (results []Point, n
 	results = make([]Point, len(points))
 
 	indexes := uniqof(points)
+	defer fillfromuniq(indexes, results)
+
 	for i, p := range points {
 		if indexes[i] != i {
 			// skip duplicates
@@ -213,12 +215,10 @@ func (ev SerialEvaler) Eval(obj Objectiver, points ...Point) (results []Point, n
 		n++
 		results[i] = p
 		if err != nil && !ev.ContinueOnErr {
-			fillfromuniq(indexes, results)
 			return results[:i+1], n, err
 		}
 	}
 
-	fillfromuniq(indexes, results)
 	return results, n, nil
 }
 

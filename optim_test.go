@@ -7,13 +7,15 @@ import (
 	"testing"
 )
 
-var tpoints = []Point{
-	NewPoint([]float64{1, 2, 3}, 0),
-	NewPoint([]float64{1, 2, 3}, 0), // duplicate point on purpose
-	NewPoint([]float64{1, 2, 4}, 0),
-	NewPoint([]float64{1, 2, 5}, 0),
-	NewPoint([]float64{1, 2, 6}, 0),
-	NewPoint([]float64{1, 2, 7}, 0),
+func testpoints() []Point {
+	return []Point{
+		NewPoint([]float64{1, 2, 3}, 0),
+		NewPoint([]float64{1, 2, 3}, 0), // duplicate point on purpose
+		NewPoint([]float64{1, 2, 4}, 0),
+		NewPoint([]float64{1, 2, 5}, 0),
+		NewPoint([]float64{1, 2, 6}, 0),
+		NewPoint([]float64{1, 2, 7}, 0),
+	}
 }
 
 type ObjTest struct {
@@ -37,6 +39,54 @@ func (o *ObjTest) Objective(x []float64) (float64, error) {
 	return tot, nil
 }
 
+func TestUniqOfPoints(t *testing.T) {
+	wantindexes := []int{0, 0, 2, 3, 4, 5}
+
+	// check uniqof func
+	points := testpoints()
+	indexes := uniqof(points)
+	for i, got := range indexes {
+		if got != wantindexes[i] {
+			t.Errorf("indexes[%v] WRONG: want %v, got %v", i, wantindexes[i], got)
+		} else {
+			t.Logf("indexes[%v] right: got %v", i, got)
+		}
+	}
+
+	// check fillfromuniq func
+	wantvals := []float64{0, 0, 2, 3, 4, 5}
+	for i := range points {
+		points[i].Val = float64(i)
+	}
+	fillfromuniq(indexes, points)
+	for i, got := range points {
+		if got.Val != wantvals[i] {
+			t.Errorf("filled points[%v].Val WRONG: want %v, got %v", i, wantvals[i], got)
+		} else {
+			t.Logf("filled points[%v].Val right: got %v", i, got)
+		}
+	}
+}
+
+func TestSerialEvaler_DupPoints(t *testing.T) {
+	obj := &ObjTest{max: 10000}
+	ev := SerialEvaler{}
+
+	tpoints := testpoints()
+	r, _, _ := ev.Eval(obj, tpoints...)
+
+	dups := testpoints()
+	for i, p := range r {
+		orig := dups[i]
+		for k := 0; k < p.Len(); k++ {
+			if p.At(k) != orig.At(k) {
+				t.Errorf("result[%v] wrong point: want %v, got %v", orig, p)
+				break
+			}
+		}
+	}
+}
+
 func TestSerialEvalerErr(t *testing.T) {
 	errcount := 3
 	exprlen := errcount + 1 // we get an extra obj call due to duplicate avoidance
@@ -44,6 +94,7 @@ func TestSerialEvalerErr(t *testing.T) {
 	obj := &ObjTest{max: errcount}
 	ev := SerialEvaler{}
 
+	tpoints := testpoints()
 	r, n, err := ev.Eval(obj, tpoints...)
 
 	if len(r) != exprlen {
@@ -70,6 +121,7 @@ func TestSerialEvalerErr(t *testing.T) {
 }
 
 func TestParallelEvalerErr(t *testing.T) {
+	tpoints := testpoints()
 	errcount := 4
 	exprlen := len(tpoints)
 	expn := exprlen - 1
@@ -104,6 +156,7 @@ func TestParallelEvalerErr(t *testing.T) {
 }
 
 func TestCacheEvalerErr(t *testing.T) {
+	tpoints := testpoints()
 	errcount := 3
 	exprlen := errcount + 1 // we get an extra obj call due to duplicate avoidance
 	expn := exprlen - 1
@@ -124,6 +177,7 @@ func TestCacheEvalerErr(t *testing.T) {
 }
 
 func TestCacheEvaler(t *testing.T) {
+	tpoints := testpoints()
 	obj := &ObjTest{max: 100000}
 	ev := NewCacheEvaler(SerialEvaler{})
 	expn := len(tpoints) - 1

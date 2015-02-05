@@ -152,7 +152,7 @@ func TestPSwarmCache(t *testing.T) {
 func patternsolver(fn bench.Func, db *sql.DB) (optim.Iterator, mesh.Mesh) {
 	low, up := fn.Bounds()
 	max, min := up[0], low[0]
-	m := mesh.NewBounded(&mesh.Infinite{StepSize: (max - min) / 10}, low, up)
+	m := &mesh.Infinite{StepSize: (max - min) / 10}
 
 	p := initialpoint(fn)
 	m.SetOrigin(p.Pos())
@@ -183,7 +183,7 @@ func swarmsolver(fn bench.Func, db *sql.DB, n int) (optim.Iterator, mesh.Mesh) {
 func pswarmsolver(fn bench.Func, db *sql.DB, n int, cache bool) (optim.Iterator, mesh.Mesh) {
 	low, up := fn.Bounds()
 	max, min := up[0], low[0]
-	m := mesh.NewBounded(&mesh.Infinite{StepSize: (max - min) / 10}, low, up)
+	m := &mesh.Infinite{StepSize: (max - min) / 10}
 
 	var ev optim.Evaler = optim.NewCacheEvaler(optim.SerialEvaler{})
 	if !cache {
