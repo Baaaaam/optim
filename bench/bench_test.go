@@ -72,7 +72,7 @@ func TestSwarmBenchRosenbrock(t *testing.T) {
 		}
 	}
 
-	t.Logf("[%v] optimum == %v, expect <= %v", fn.Name(), fn.Optima()[0].Val, fn.Tol())
+	t.Logf("[%v] optimum == %v, expect <= 100", fn.Name(), fn.Optima()[0].Val)
 	t.Logf("  success rate is %v/%v (%v%%) - averaged %v", nsuccess, n, float64(nsuccess)/float64(n)*100, sum/float64(n))
 }
 

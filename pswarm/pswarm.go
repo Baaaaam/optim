@@ -21,7 +21,7 @@ import (
 // DefaultSocial = Constriction(2.05, 2.05)*2.05.  DefaultInertia is set equal
 // to the corresponding constriction coefficient.
 //
-// I have found that inertia = Constriction(2.098, 2.098) and  seems to work
+// I have found that inertia = Constriction(2.0098, 2.0098) and  seems to work
 // better when using the swarm solver (without pattern search) for 30D
 // Rosenbrock.
 const (
@@ -68,7 +68,9 @@ func (p *Particle) Move(best optim.Point, vmax []float64, inertia, social, cogni
 		p.Vel[i] = inertia*currv +
 			cognition*r1*(p.Best.At(i)-p.At(i)) +
 			social*r2*(best.At(i)-p.At(i))
-		p.Vel[i] = math.Min(p.Vel[i], vmax[i])
+		if math.Abs(p.Vel[i]) > vmax[i] {
+			p.Vel[i] *= math.Abs(vmax[i] / p.Vel[i])
+		}
 	}
 
 	// update position
@@ -94,17 +96,17 @@ type Population []*Particle
 // and generates velocities for each dimension i initialized to uniform random
 // values between minv[i] and maxv[i].  github.com/rwcarlsen/optim.Rand is
 // used for random numbers.
-func NewPopulation(points []optim.Point, minv, maxv []float64) Population {
+func NewPopulation(points []optim.Point, vmax []float64) Population {
 	pop := make(Population, len(points))
 	for i, p := range points {
 		pop[i] = &Particle{
 			Id:    i,
 			Point: p,
-			Best:  optim.NewPoint(p.Pos(), math.Inf(1)),
-			Vel:   make([]float64, len(minv)),
+			Best:  p,
+			Vel:   make([]float64, len(vmax)),
 		}
-		for j := range minv {
-			pop[i].Vel[j] = minv[j] + (maxv[j]-minv[j])*optim.RandFloat()
+		for j, v := range vmax {
+			pop[i].Vel[j] = v * (1 - 2*optim.RandFloat())
 		}
 	}
 	return pop
@@ -113,15 +115,13 @@ func NewPopulation(points []optim.Point, minv, maxv []float64) Population {
 // NewPopulationRand creates a population of randomly positioned particles
 // uniformly distributed in the box-bounds described by low and up.
 func NewPopulationRand(n int, low, up []float64) Population {
-	minv := make([]float64, len(up))
-	maxv := make([]float64, len(up))
+	vmax := make([]float64, len(up))
 	for i := range up {
-		maxv[i] = (up[i] - low[i]) * 1
-		minv[i] = 0 * maxv[i]
+		vmax[i] = (up[i] - low[i]) / 2
 	}
 
 	points := pop.New(n, low, up)
-	return NewPopulation(points, minv, maxv)
+	return NewPopulation(points, vmax)
 }
 
 func (pop Population) Points() []optim.Point {
