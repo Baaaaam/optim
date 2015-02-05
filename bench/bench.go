@@ -237,13 +237,12 @@ func (fn Rosenbrock) Eval(x []float64) float64 {
 		return math.Inf(1)
 	}
 
-	tot1 := 0.0
-	tot2 := 0.0
+	tot := 0.0
 	for i := 0; i < fn.NDim-1; i++ {
-		tot1 += math.Pow(x[i+1]-x[i]*x[i], 2)
-		tot2 += math.Pow(x[i]-1, 2)
+		tot += 100 * math.Pow(x[i+1]-x[i]*x[i], 2)
+		tot += math.Pow(x[i]-1, 2)
 	}
-	return 100*tot1 + tot2
+	return tot
 }
 
 func (fn Rosenbrock) Bounds() (low, up []float64) {
@@ -267,10 +266,13 @@ func (fn Rosenbrock) Optima() []optim.Point {
 }
 
 func Benchmark(t *testing.T, solv *optim.Solver, fn Func) {
-	solv.Stop = func(s *optim.Solver) bool {
-		return s.Best().Val < fn.Tol()
+	for solv.Next() {
+		if solv.Best().Val < fn.Tol() {
+			break
+		}
 	}
-	err := solv.Run()
+	err := solv.Err()
+
 	optim := fn.Optima()[0].Val
 	if err != nil {
 		t.Errorf("[ERROR:%v] %v", fn.Name(), err)

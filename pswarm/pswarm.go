@@ -7,24 +7,27 @@ import (
 
 	"github.com/rwcarlsen/optim"
 	"github.com/rwcarlsen/optim/mesh"
+	"github.com/rwcarlsen/optim/pop"
 )
 
-// Params chosen from:
-//
-//     Ioan Cristian Trelea, The particle swarm optimization algorithm:
-//     convergence analysis and parameter selection, Information Processing
-//     Letters, Volume 85, Issue 6, 31 March 2003, Pages 317-325, ISSN 0020-0190,
-//     http://dx.doi.org/10.1016/S0020-0190(02)00447-7.
-//
 // These params originate from work done by Clerc:
 //
 //     Clerc and M.  “The swarm and the queen: towards a deterministic and
-//     adaptive particle swarm optimization” Proc. 1999 Congress on Evolutionary
-//     Computation, pp. 1951-1957
+//     adaptive particle swarm optimization” Proc. 1999 Congress on
+//     Evolutionary Computation, pp. 1951-1957
+//
+// The cognition and social parameters correspond to c1 and c2 values of 2.05
+// that have been multiplied by their constriction coeffient - i.e.
+// DefaultSocial = Constriction(2.05, 2.05)*2.05.  DefaultInertia is set equal
+// to the corresponding constriction coefficient.
+//
+// I have found that inertia = Constriction(2.098, 2.098) and  seems to work
+// better when using the swarm solver (without pattern search) for 30D
+// Rosenbrock.
 const (
-	DefaultCognition = 1.494
-	DefaultSocial    = 1.494
-	DefaultInertia   = 0.729
+	DefaultCognition = 1.496179765663133
+	DefaultSocial    = 1.496179765663133
+	DefaultInertia   = 0.7298437881283576
 )
 
 const (
@@ -32,11 +35,48 @@ const (
 	TblBest      = "swarmbest"
 )
 
+// Constriction calculates the constriction coefficient for the given c1 and
+// c2 for the particle velocity equation:
+//
+//    v_next = k(v_curr + c1*rand*(p_glob-x) + c2*rand*(p_personal-x))
+//
+//    or
+//
+//    v_next = w*v_curr + b1*rand*(p_glob-x) + b2*rand*(p_personal-x)
+//
+//    (with constriction coefficient multiplied through.
+//
+// c1+c2 should usually be greater than (but close to) 4.  'w = k' is often
+// referred to as the inertia in the traditional swarm equation
+func Constriction(c1, c2 float64) float64 {
+	phi := c1 + c2
+	return 2 / math.Abs(2-phi-math.Sqrt(phi*phi-4*phi))
+}
+
 type Particle struct {
 	Id int
 	optim.Point
 	Vel  []float64
 	Best optim.Point
+}
+
+func (p *Particle) Move(best optim.Point, vmax []float64, inertia, social, cognition float64) {
+	// update velocity
+	r1 := optim.RandFloat()
+	r2 := optim.RandFloat()
+	for i, currv := range p.Vel {
+		p.Vel[i] = inertia*currv +
+			cognition*r1*(p.Best.At(i)-p.At(i)) +
+			social*r2*(best.At(i)-p.At(i))
+		p.Vel[i] = math.Min(p.Vel[i], vmax[i])
+	}
+
+	// update position
+	pos := make([]float64, p.Len())
+	for i := range pos {
+		pos[i] = p.At(i) + p.Vel[i]
+	}
+	p.Point = optim.NewPoint(pos, math.Inf(1))
 }
 
 func (p *Particle) Update(newp optim.Point) {
@@ -70,6 +110,18 @@ func NewPopulation(points []optim.Point, minv, maxv []float64) Population {
 	return pop
 }
 
+func NewPopulationRand(n int, low, up []float64) Population {
+	minv := make([]float64, len(up))
+	maxv := make([]float64, len(up))
+	for i := range up {
+		maxv[i] = (up[i] - low[i]) * 1
+		minv[i] = 0 * maxv[i]
+	}
+
+	points := pop.New(n, low, up)
+	return NewPopulation(points, minv, maxv)
+}
+
 func (pop Population) Points() []optim.Point {
 	points := make([]optim.Point, 0, len(pop))
 	for _, p := range pop {
@@ -98,7 +150,7 @@ type Option func(*Iterator)
 
 func Vmax(vmaxes []float64) Option {
 	return func(it *Iterator) {
-		it.Mover.Vmax = vmaxes
+		it.Vmax = vmaxes
 	}
 }
 
@@ -112,9 +164,9 @@ func Vmax(vmaxes []float64) Option {
 //     10.1109/CEC.2001.934374
 func VmaxBounds(low, up []float64) Option {
 	return func(it *Iterator) {
-		it.Mover.Vmax = make([]float64, len(low))
-		for i := range it.Mover.Vmax {
-			it.Mover.Vmax[i] = up[i] - low[i]
+		it.Vmax = make([]float64, len(low))
+		for i := range it.Vmax {
+			it.Vmax[i] = up[i] - low[i]
 		}
 	}
 }
@@ -133,8 +185,8 @@ func KillDist(dist float64) Option {
 
 func VelUpdParams(cognition, social float64) Option {
 	return func(it *Iterator) {
-		it.Mover.Cognition = cognition
-		it.Mover.Social = social
+		it.Cognition = cognition
+		it.Social = social
 	}
 }
 
@@ -148,9 +200,15 @@ func VelUpdParams(cognition, social float64) Option {
 // 10.1109/CEC.2001.934374
 func LinInertia(start, end float64, maxiter int) Option {
 	return func(it *Iterator) {
-		it.Mover.InertiaFn = func(iter int) float64 {
+		it.InertiaFn = func(iter int) float64 {
 			return start - (start-end)*float64(iter)/float64(maxiter)
 		}
+	}
+}
+
+func FixedInertia(v float64) Option {
+	return func(it *Iterator) {
+		it.InertiaFn = func(iter int) float64 { return v }
 	}
 }
 
@@ -161,24 +219,35 @@ type Iterator struct {
 	KillDist float64
 	Pop      Population
 	optim.Evaler
-	*Mover
+	Cognition float64
+	Social    float64
+	InertiaFn func(iter int) float64
+	// Vmax is the speed limit in each dimension for particles.  If nil,
+	// infinity is used.
+	Vmax  []float64
 	Db    *sql.DB
 	count int
 	best  optim.Point
 }
 
-func NewIterator(e optim.Evaler, m *Mover, pop Population, opts ...Option) *Iterator {
+func NewIterator(e optim.Evaler, pop Population, opts ...Option) *Iterator {
 	if e == nil {
 		e = optim.SerialEvaler{}
 	}
-	if m == nil {
-		m = &Mover{Cognition: DefaultCognition, Social: DefaultSocial}
+
+	vmax := make([]float64, pop[0].Len())
+	for i := range vmax {
+		vmax[i] = math.Inf(1)
 	}
+
 	it := &Iterator{
-		Pop:    pop,
-		Evaler: e,
-		Mover:  m,
-		best:   pop.Best().Point,
+		Pop:       pop,
+		Evaler:    e,
+		Cognition: DefaultCognition,
+		Social:    DefaultSocial,
+		InertiaFn: func(iter int) float64 { return DefaultInertia },
+		Vmax:      vmax,
+		best:      pop.Best().Point,
 	}
 
 	for _, opt := range opts {
@@ -197,23 +266,29 @@ func (it *Iterator) AddPoint(p optim.Point) {
 
 func (it *Iterator) Iterate(obj optim.Objectiver, m mesh.Mesh) (best optim.Point, neval int, err error) {
 	it.count++
+
+	// project positions onto mesh
 	points := it.Pop.Points()
 	if m != nil {
 		for i, p := range points {
 			points[i] = optim.Nearest(p, m)
 		}
 	}
+
+	// evaluate current positions
 	results, n, err := it.Evaler.Eval(obj, points...)
 	if err != nil {
 		return optim.Point{Val: math.Inf(1)}, n, err
 	}
-
 	for i := range results {
 		it.Pop[i].Update(results[i])
 	}
-
 	it.updateDb()
-	it.Mover.Move(it.best, it.Pop)
+
+	// move particles and update current best
+	for _, p := range it.Pop {
+		p.Move(it.best, it.Vmax, it.InertiaFn(it.count), it.Social, it.Cognition)
+	}
 
 	pbest := it.Pop.Best()
 	// TODO: write test to make sure this checks pbest.Best.Val instead of p.Val.
@@ -301,44 +376,6 @@ func (it *Iterator) updateDb() {
 	args = append(args, pos2iface(glob.Pos())...)
 	_, err = tx.Exec(s2, args...)
 	panicif(err)
-}
-
-type Mover struct {
-	Cognition float64
-	Social    float64
-	// Vmax is the speed limit in each dimension for particles.  If nil,
-	// infinity is used.
-	Vmax      []float64
-	InertiaFn func(int) float64
-	iter      int
-}
-
-func (mv *Mover) Move(best optim.Point, pop Population) {
-	mv.iter++
-	if mv.InertiaFn == nil {
-		mv.InertiaFn = func(iter int) float64 {
-			return DefaultInertia
-		}
-	}
-
-	for _, p := range pop {
-		w1 := optim.RandFloat()
-		w2 := optim.RandFloat()
-		// update velocity
-		for i, currv := range p.Vel {
-			p.Vel[i] = mv.InertiaFn(mv.iter)*currv +
-				mv.Cognition*w1*(p.Best.At(i)-p.At(i)) +
-				mv.Social*w2*(best.At(i)-p.At(i))
-			p.Vel[i] = math.Min(p.Vel[i], mv.Vmax[i])
-		}
-
-		// update position
-		pos := make([]float64, p.Len())
-		for i := range pos {
-			pos[i] = p.At(i) + p.Vel[i]
-		}
-		p.Point = optim.NewPoint(pos, math.Inf(1))
-	}
 }
 
 // TODO: remove all uses of this
