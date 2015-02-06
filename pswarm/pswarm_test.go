@@ -27,6 +27,105 @@ func (_ *fakeRand) Perm(n int) []int {
 	return p
 }
 
+func TestNewPopulationRand(t *testing.T) {
+	l, u := -5.0, 5.0
+	ndim := 7
+	n := 100000
+
+	vmax := (u - l) / 2
+	low := []float64{}
+	up := []float64{}
+	for i := 0; i < ndim; i++ {
+		low = append(low, l)
+		up = append(up, u)
+	}
+
+	pop := NewPopulationRand(n, low, up)
+
+	vtot0 := 0.0
+	for i, p := range pop {
+		if p.Val != math.Inf(1) && !t.Failed() {
+			t.Errorf("particle's initial value is not infinity")
+		}
+		if p.Best.Val != math.Inf(1) && !t.Failed() {
+			t.Errorf("particle's initial best value is not infinity")
+		}
+
+		for j, v := range p.Vel {
+			if v > vmax || v < -vmax {
+				t.Errorf("particle[%v].Vel[%v] outside bounds: %v !< %v !< %v", i, j, -vmax, v, vmax)
+			}
+			if j == 0 {
+				vtot0 += v
+			}
+		}
+	}
+
+	avg := (vtot0 / float64(n))
+	if math.Abs(avg) > 0.01*vmax {
+		t.Errorf("bad avg vel for 1st dimension: want 0, got %v", .01*vmax, avg)
+	} else {
+		t.Logf("avg vel for 1st dimension: %v < %v (aka .01*vmax)", math.Abs(avg), .01*vmax)
+	}
+
+}
+
+func TestPopulation_Points(t *testing.T) {
+	l, u := -5.0, 5.0
+	ndim := 2
+	n := 100
+
+	low := []float64{}
+	up := []float64{}
+	for i := 0; i < ndim; i++ {
+		low = append(low, l)
+		up = append(up, u)
+	}
+
+	pop := NewPopulationRand(n, low, up)
+
+	want := 42.0
+	pop[0].Val = want
+	points := pop.Points()
+	points[0].Val = 7
+	points[0] = optim.NewPoint([]float64{0}, 13)
+	got := pop[0].Val
+
+	if got != want {
+		t.Errorf("a modification to a returned point modified the original particle:")
+		t.Errorf("    want %v, got %v", want, got)
+	}
+}
+
+func TestPopulation_Best(t *testing.T) {
+	l, u := -5.0, 5.0
+	ndim := 2
+	n := 100
+
+	low := []float64{}
+	up := []float64{}
+	for i := 0; i < ndim; i++ {
+		low = append(low, l)
+		up = append(up, u)
+	}
+
+	pop := NewPopulationRand(n, low, up)
+
+	want := 42.0
+
+	pop[4].Val = want
+	best := pop.Best()
+	if best.Val == want {
+		t.Errorf("Best method uses the particles current value instead of the particles best value.")
+	}
+
+	pop[4].Best.Val = want
+	best = pop.Best()
+	if best.Val != want {
+		t.Errorf("Best method is broken somehow.")
+	}
+}
+
 func TestParticle_Move(t *testing.T) {
 	vmax := []float64{40, 40, 40}
 	fakerng := &fakeRand{[]float64{.314, .739}, 0}

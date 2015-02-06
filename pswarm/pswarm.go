@@ -116,13 +116,8 @@ func NewPopulation(points []optim.Point, vmax []float64) Population {
 // NewPopulationRand creates a population of randomly positioned particles
 // uniformly distributed in the box-bounds described by low and up.
 func NewPopulationRand(n int, low, up []float64) Population {
-	vmax := make([]float64, len(up))
-	for i := range up {
-		vmax[i] = (up[i] - low[i]) / 2
-	}
-
 	points := pop.New(n, low, up)
-	return NewPopulation(points, vmax)
+	return NewPopulation(points, vmaxfrombounds(low, up))
 }
 
 func (pop Population) Points() []optim.Point {
@@ -166,7 +161,7 @@ func VmaxAll(vmax float64) Option {
 }
 
 // VmaxBounds sets the maximum particle speed for each dimension equal to
-// the bounded range for the problem - i.e. up[i]-low[i] for each dimension.
+// the bounded range for the problem - i.e. up[i]-low[i]/2 for each dimension.
 // This is a good rule of thumb given in:
 //
 //     Eberhart, R.C.; Yuhui Shi, "Particle swarm optimization: developments,
@@ -175,10 +170,7 @@ func VmaxAll(vmax float64) Option {
 //     10.1109/CEC.2001.934374
 func VmaxBounds(low, up []float64) Option {
 	return func(it *Iterator) {
-		it.Vmax = make([]float64, len(low))
-		for i := range it.Vmax {
-			it.Vmax[i] = (up[i] - low[i]) / 2
-		}
+		it.Vmax = vmaxfrombounds(low, up)
 	}
 }
 
@@ -407,4 +399,12 @@ func panicif(err error) {
 	if err != nil {
 		panic(err.Error())
 	}
+}
+
+func vmaxfrombounds(low, up []float64) []float64 {
+	vmax := make([]float64, len(low))
+	for i := range vmax {
+		vmax[i] = (up[i] - low[i]) / 2
+	}
+	return vmax
 }
