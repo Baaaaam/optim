@@ -64,7 +64,7 @@ func NewIterator(e optim.Evaler, start optim.Point, opts ...Option) *Iterator {
 		ev:           e,
 		Poller:       &CompassPoller{Nkeep: start.Len()},
 		Searcher:     NullSearcher{},
-		NsuccessGrow: 2,
+		NsuccessGrow: -1,
 	}
 
 	for _, opt := range opts {
