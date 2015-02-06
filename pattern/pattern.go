@@ -229,19 +229,22 @@ func (cp *CompassPoller) Points() []optim.Point { return cp.points }
 
 func (cp *CompassPoller) Poll(obj optim.Objectiver, ev optim.Evaler, m mesh.Mesh, from optim.Point) (success bool, best optim.Point, neval int, err error) {
 	best = from
+
 	pollpoints := []optim.Point{}
 
 	// Only poll compass directions if we haven't polled from this point
-	// before.
+	// before.  DONT DELETE - this can fire sometimes if the mesh isn't
+	// allowed to contract below a certain step (i.e. integer meshes).
 	h := from.Hash()
 	if h != cp.prevhash || cp.prevstep != m.Step() {
 		// TODO: write test that checks we poll compass dirs again if only mesh
 		// step changed (and not from point)
 		pollpoints = append(pollpoints, genPollPoints(from, CompassNp1, m)...)
+		pollpoints = append(pollpoints, genPollPoints(from, RandomN(from.Len()), m)...)
 		cp.prevhash = h
 	} else {
 		// Use random directions instead.
-		pollpoints = append(pollpoints, genPollPoints(from, Random2N, m)...)
+		pollpoints = append(pollpoints, genPollPoints(from, RandomN(2*from.Len()), m)...)
 	}
 	cp.prevstep = m.Step()
 
@@ -395,39 +398,40 @@ func pointFromDirec(from optim.Point, direc []int, m mesh.Mesh) optim.Point {
 	return optim.Nearest(p, m)
 }
 
-// Random2N returns 2 * ndim random polling directions that exclude the
+// Random2N returns ndim random polling directions that exclude the
 // compass directions.
-func Random2N(ndim int) [][]int {
-	n := 2 * ndim
-	dirs := make([][]int, 0, n)
-	for len(dirs) < n {
-		d1 := make([]int, ndim)
-		d2 := make([]int, ndim)
+func RandomN(n int) SpanFunc {
+	return func(ndim int) [][]int {
+		dirs := make([][]int, 0, n)
+		for len(dirs) < n {
+			d1 := make([]int, ndim)
+			d2 := make([]int, ndim)
 
-		nNonzero := 1
-		if ndim == 1 { // compass directions cover everything
-			return dirs
-		} else if ndim == 2 { // this check prevents calling Intn(0) - which is invalid
-			nNonzero = 2 // exclude compass directions
-		} else {
-			// Intn(-2)+2 is to exclude vector of all zeros and compass directions.
-			nNonzero = optim.Rand.Intn(ndim-2) + 2
-		}
-		perms := optim.Rand.Perm(ndim)
-		for i := 0; i < nNonzero; i++ {
-			r := optim.Rand.Intn(2)
-			if r == 0 {
-				d1[perms[i]] = 1
-				d2[perms[i]] = -1
+			nNonzero := 1
+			if ndim == 1 { // compass directions cover everything
+				return dirs
+			} else if ndim == 2 { // this check prevents calling Intn(0) - which is invalid
+				nNonzero = 2 // exclude compass directions
 			} else {
-				d1[perms[i]] = -1
-				d2[perms[i]] = 1
+				// Intn(-2)+2 is to exclude vector of all zeros and compass directions.
+				nNonzero = optim.Rand.Intn(ndim-2) + 2
 			}
+			perms := optim.Rand.Perm(ndim)
+			for i := 0; i < nNonzero; i++ {
+				r := optim.Rand.Intn(2)
+				if r == 0 {
+					d1[perms[i]] = 1
+					d2[perms[i]] = -1
+				} else {
+					d1[perms[i]] = -1
+					d2[perms[i]] = 1
+				}
+			}
+			dirs = append(dirs, d1)
+			dirs = append(dirs, d2)
 		}
-		dirs = append(dirs, d1)
-		dirs = append(dirs, d2)
+		return dirs
 	}
-	return dirs
 }
 
 func pos2iface(pos []float64) []interface{} {
