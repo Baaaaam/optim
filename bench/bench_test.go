@@ -23,8 +23,8 @@ const (
 
 const (
 	maxeval      = 50000
-	maxiter      = 1000
-	maxnoimprove = 300
+	maxiter      = 5000
+	maxnoimprove = 500
 	minstep      = 1e-8
 )
 

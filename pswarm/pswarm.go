@@ -31,8 +31,9 @@ const (
 )
 
 const (
-	TblParticles = "swarmparticles"
-	TblBest      = "swarmbest"
+	TblParticles     = "swarmparticles"
+	TblParticlesBest = "swarmparticlesbest"
+	TblBest          = "swarmbest"
 )
 
 // Constriction calculates the constriction coefficient for the given c1 and
@@ -69,7 +70,7 @@ func (p *Particle) Move(best optim.Point, vmax []float64, inertia, social, cogni
 			cognition*r1*(p.Best.At(i)-p.At(i)) +
 			social*r2*(best.At(i)-p.At(i))
 		if math.Abs(p.Vel[i]) > vmax[i] {
-			p.Vel[i] *= math.Abs(vmax[i] / p.Vel[i])
+			p.Vel[i] = math.Copysign(vmax[i], p.Vel[i])
 		}
 	}
 
@@ -156,7 +157,15 @@ func Vmax(vmaxes []float64) Option {
 	}
 }
 
-// VmaxBounds sets the maximum particle velocity for each dimension equal to
+func VmaxAll(vmax float64) Option {
+	return func(it *Iterator) {
+		for i := range it.Vmax {
+			it.Vmax[i] = vmax
+		}
+	}
+}
+
+// VmaxBounds sets the maximum particle speed for each dimension equal to
 // the bounded range for the problem - i.e. up[i]-low[i] for each dimension.
 // This is a good rule of thumb given in:
 //
@@ -168,7 +177,7 @@ func VmaxBounds(low, up []float64) Option {
 	return func(it *Iterator) {
 		it.Vmax = make([]float64, len(low))
 		for i := range it.Vmax {
-			it.Vmax[i] = (up[i] - low[i])
+			it.Vmax[i] = (up[i] - low[i]) / 2
 		}
 	}
 }
@@ -322,6 +331,13 @@ func (it *Iterator) initdb() {
 	_, err := it.Db.Exec(s)
 	panicif(err)
 
+	s = "CREATE TABLE IF NOT EXISTS " + TblParticlesBest + " (particle INTEGER, iter INTEGER, best REAL"
+	s += it.xdbsql("define")
+	s += ");"
+
+	_, err = it.Db.Exec(s)
+	panicif(err)
+
 	s = "CREATE TABLE IF NOT EXISTS " + TblBest + " (iter INTEGER, val REAL"
 	s += it.xdbsql("define")
 	s += ");"
@@ -364,15 +380,21 @@ func (it *Iterator) updateDb() {
 	}
 	defer tx.Commit()
 
-	s1 := "INSERT INTO " + TblParticles + " (particle,iter,val" + it.xdbsql("x") + ") VALUES (?,?,?" + it.xdbsql("?") + ");"
-	s2 := "INSERT INTO " + TblBest + " (iter,val" + it.xdbsql("x") + ") VALUES (?,?" + it.xdbsql("?") + ");"
+	s0 := "INSERT INTO " + TblParticles + " (particle,iter,val" + it.xdbsql("x") + ") VALUES (?,?,?" + it.xdbsql("?") + ");"
+	s1 := "INSERT INTO " + TblParticlesBest + " (particle,iter,best" + it.xdbsql("x") + ") VALUES (?,?,?" + it.xdbsql("?") + ");"
 	for _, p := range it.Pop {
 		args := []interface{}{p.Id, it.count, p.Val}
 		args = append(args, pos2iface(p.Pos())...)
-		_, err := tx.Exec(s1, args...)
+		_, err := tx.Exec(s0, args...)
+		panicif(err)
+
+		args = []interface{}{p.Id, it.count, p.Best.Val}
+		args = append(args, pos2iface(p.Best.Pos())...)
+		_, err = tx.Exec(s1, args...)
 		panicif(err)
 	}
 
+	s2 := "INSERT INTO " + TblBest + " (iter,val" + it.xdbsql("x") + ") VALUES (?,?" + it.xdbsql("?") + ");"
 	glob := it.best
 	args := []interface{}{it.count, glob.Val}
 	args = append(args, pos2iface(glob.Pos())...)
