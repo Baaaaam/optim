@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	rand2 "bitbucket.org/MaVo159/rand"
 	_ "github.com/mxk/go-sqlite/sqlite3"
 	"github.com/rwcarlsen/optim"
 	"github.com/rwcarlsen/optim/bench"
@@ -28,8 +29,7 @@ const (
 	minstep      = 1e-8
 )
 
-//var seed int64 = time.Now().Unix()
-var seed int64 = 1
+const seed = 1
 
 func seedrng(seed int64) {
 	if seed < 0 {
@@ -38,42 +38,49 @@ func seedrng(seed int64) {
 	optim.Rand = rand.New(rand.NewSource(seed))
 }
 
-func TestSwarmBenchRosenbrock(t *testing.T) {
+func TestBenchSwarmRosen(t *testing.T) {
+	optim.Rand = rand2.New(rand2.NewMersenneTwister(seed))
 	seedrng(seed)
-	fn := bench.Rosenbrock{30}
 
-	n := 50
+	ndim := 30
+	npar := 30
+	nrun := 20
+	maxiter := 10000
 
 	os.Remove("rosenbench.sqlite")
 	db, _ := sql.Open("sqlite3", "rosenbench.sqlite")
 	defer db.Close()
 	db = nil
 
-	gots := make([]float64, n)
+	fn := bench.Rosenbrock{ndim}
+
 	nsuccess := 0
+	neval := 0
+	niter := 0
 	sum := 0.0
-	for i := 0; i < n; i++ {
-		it, m := swarmsolver(fn, db, 60)
+	for i := 0; i < nrun; i++ {
+		it, m := swarmsolver(fn, db, npar)
 		solv := &optim.Solver{
-			Iter:         it,
-			Obj:          optim.Func(fn.Eval),
-			Mesh:         m,
-			MaxIter:      5000,
-			MaxEval:      50000,
-			MaxNoImprove: 0,
-			MinStep:      -1,
+			Iter:    it,
+			Obj:     optim.Func(fn.Eval),
+			Mesh:    m,
+			MaxEval: maxiter * npar,
+			MaxIter: maxiter,
+			MinStep: -1,
 		}
 
 		solv.Run()
-		gots[i] = solv.Best().Val
-		sum += gots[i]
-		if gots[i] < 100 {
+		neval += solv.Neval()
+		niter += solv.Niter()
+		sum += solv.Best().Val
+		if solv.Best().Val < 100 {
 			nsuccess++
 		}
 	}
 
 	t.Logf("[%v] optimum == %v, expect <= 100", fn.Name(), fn.Optima()[0].Val)
-	t.Logf("  success rate is %v/%v (%v%%) - averaged %v", nsuccess, n, float64(nsuccess)/float64(n)*100, sum/float64(n))
+	t.Logf("  success rate is %v/%v (%v%%) - averaged %v", nsuccess, nrun, float64(nsuccess)/float64(nrun)*100, sum/float64(nrun))
+	t.Logf("  averaged %v iter and %v evals", float64(niter)/float64(nrun), float64(neval)/float64(nrun))
 }
 
 func TestPattern(t *testing.T) {
@@ -172,9 +179,14 @@ func swarmsolver(fn bench.Func, db *sql.DB, n int) (optim.Iterator, mesh.Mesh) {
 		}
 	}
 
+	c := 2.05
+	k := pswarm.Constriction(c, c)
+
 	pop := pswarm.NewPopulationRand(n, low, up)
 	it := pswarm.NewIterator(nil, pop,
 		pswarm.VmaxBounds(fn.Bounds()),
+		pswarm.VelUpdParams(k*c, k*c),
+		pswarm.FixedInertia(k),
 		pswarm.DB(db),
 	)
 	return it, m
