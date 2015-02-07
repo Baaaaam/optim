@@ -60,6 +60,7 @@ func TestBenchSwarmRosen(t *testing.T) {
 	sum := 0.0
 	for i := 0; i < nrun; i++ {
 		it, m := swarmsolver(fn, db, npar)
+		//it, m := pswarmsolver(fn, db, npar, false)
 		solv := &optim.Solver{
 			Iter:    it,
 			Obj:     optim.Func(fn.Eval),
@@ -175,11 +176,9 @@ func swarmsolver(fn bench.Func, db *sql.DB, n int) (optim.Iterator, mesh.Mesh) {
 	m := &mesh.Infinite{StepSize: 0}
 
 	if n < 0 {
-		n = 1 * len(low)
+		n = 30 + 1*len(low)
 		if n > maxeval/500 {
 			n = maxeval / 500
-		} else if n < 30 {
-			n = 30
 		}
 	}
 
