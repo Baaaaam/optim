@@ -1,4 +1,4 @@
-package pswarm
+package swarm
 
 import (
 	"database/sql"

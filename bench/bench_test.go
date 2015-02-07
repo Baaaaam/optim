@@ -14,7 +14,7 @@ import (
 	"github.com/rwcarlsen/optim/bench"
 	"github.com/rwcarlsen/optim/mesh"
 	"github.com/rwcarlsen/optim/pattern"
-	"github.com/rwcarlsen/optim/pswarm"
+	"github.com/rwcarlsen/optim/swarm"
 )
 
 const (
@@ -183,14 +183,14 @@ func swarmsolver(fn bench.Func, db *sql.DB, n int) (optim.Iterator, mesh.Mesh) {
 	}
 
 	//c := 2.01
-	//k := pswarm.Constriction(c, c)
+	//k := swarm.Constriction(c, c)
 
-	pop := pswarm.NewPopulationRand(n, low, up)
-	it := pswarm.NewIterator(nil, pop,
-		pswarm.VmaxBounds(fn.Bounds()),
-		pswarm.DB(db),
-		//pswarm.VelUpdParams(k*c, k*c),
-		//pswarm.FixedInertia(k),
+	pop := swarm.NewPopulationRand(n, low, up)
+	it := swarm.NewIterator(nil, pop,
+		swarm.VmaxBounds(fn.Bounds()),
+		swarm.DB(db),
+		//swarm.VelUpdParams(k*c, k*c),
+		//swarm.FixedInertia(k),
 	)
 	return it, m
 }
