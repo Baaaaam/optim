@@ -228,7 +228,7 @@ type Rosenbrock struct {
 
 func (fn Rosenbrock) Name() string { return fmt.Sprintf("Rosenbrock_%vD", fn.NDim) }
 
-func (fn Rosenbrock) Tol() float64 { return float64(fn.NDim) }
+func (fn Rosenbrock) Tol() float64 { return 3 * float64(fn.NDim) }
 
 func (fn Rosenbrock) Eval(x []float64) float64 {
 	if !InsideBounds(x, fn) {

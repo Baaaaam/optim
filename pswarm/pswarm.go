@@ -10,24 +10,24 @@ import (
 	"github.com/rwcarlsen/optim/pop"
 )
 
-// These params originate from work done by Clerc:
+// These params are calculated using a constriction factor originally
+// described in:
 //
 //     Clerc and M.  “The swarm and the queen: towards a deterministic and
 //     adaptive particle swarm optimization” Proc. 1999 Congress on
 //     Evolutionary Computation, pp. 1951-1957
 //
-// The cognition and social parameters correspond to c1 and c2 values of 2.05
+// The cognition and social parameters correspond to c1 and c2 values of 2.01
 // that have been multiplied by their constriction coeffient - i.e.
-// DefaultSocial = Constriction(2.05, 2.05)*2.05.  DefaultInertia is set equal
-// to the corresponding constriction coefficient.
-//
-// I have found that inertia = Constriction(2.0098, 2.0098) and  seems to work
-// better when using the swarm solver (without pattern search) for 30D
-// Rosenbrock.
+// DefaultSocial = Constriction(2.01, 2.01)*2.01.  DefaultInertia is set equal
+// to the constriction coefficient.  Eberhart, R.C.; Yuhui Shi report better
+// performance than my solver for 30D Rosenbrock using c1=c2=2.05, but my
+// solver performs much worse with those parameter values.  TODO: find out why.
+
 const (
-	DefaultCognition = 1.496179765663133
-	DefaultSocial    = 1.496179765663133
-	DefaultInertia   = 0.7298437881283576
+	DefaultCognition = 1.7451333177369712
+	DefaultSocial    = 1.7451333177369712
+	DefaultInertia   = 0.8682255312124236
 )
 
 const (

@@ -29,7 +29,7 @@ const (
 	minstep      = 1e-8
 )
 
-const seed = 1
+const seed = 7
 
 func seedrng(seed int64) {
 	if seed < 0 {
@@ -68,7 +68,11 @@ func TestBenchSwarmRosen(t *testing.T) {
 			MaxIter: maxiter,
 		}
 
-		solv.Run()
+		for solv.Next() {
+			if solv.Best().Val < 100 {
+				break
+			}
+		}
 		neval += solv.Neval()
 		niter += solv.Niter()
 		sum += solv.Best().Val
@@ -171,21 +175,23 @@ func swarmsolver(fn bench.Func, db *sql.DB, n int) (optim.Iterator, mesh.Mesh) {
 	m := &mesh.Infinite{StepSize: 0}
 
 	if n < 0 {
-		n = 30 + 1*len(low)
+		n = 1 * len(low)
 		if n > maxeval/500 {
 			n = maxeval / 500
+		} else if n < 30 {
+			n = 30
 		}
 	}
 
-	c := 2.05
-	k := pswarm.Constriction(c, c)
+	//c := 2.01
+	//k := pswarm.Constriction(c, c)
 
 	pop := pswarm.NewPopulationRand(n, low, up)
 	it := pswarm.NewIterator(nil, pop,
 		pswarm.VmaxBounds(fn.Bounds()),
-		pswarm.VelUpdParams(k*c, k*c),
-		pswarm.FixedInertia(k),
 		pswarm.DB(db),
+		//pswarm.VelUpdParams(k*c, k*c),
+		//pswarm.FixedInertia(k),
 	)
 	return it, m
 }
