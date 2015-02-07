@@ -66,7 +66,6 @@ func TestBenchSwarmRosen(t *testing.T) {
 			Mesh:    m,
 			MaxEval: maxiter * npar,
 			MaxIter: maxiter,
-			MinStep: -1,
 		}
 
 		solv.Run()
@@ -113,7 +112,6 @@ func TestSwarm(t *testing.T) {
 			MaxIter:      maxiter,
 			MaxEval:      maxeval,
 			MaxNoImprove: maxnoimprove,
-			MinStep:      -1, // needed because swarm doesn't operate on discrete mesh
 		}
 
 		bench.Benchmark(t, solv, fn)

@@ -74,7 +74,7 @@ func (s *Solver) Next() (more bool) {
 	more = true && (s.MaxNoImprove == 0 || s.noimprove < s.MaxNoImprove)
 	more = more && (s.MaxIter == 0 || s.niter < s.MaxIter)
 	more = more && (s.MaxEval == 0 || s.neval < s.MaxEval)
-	more = more && s.Mesh.Step() > s.MinStep
+	more = more && (s.MinStep == 0 || s.Mesh.Step() > s.MinStep)
 	return more
 }
 
