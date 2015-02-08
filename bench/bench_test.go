@@ -4,11 +4,9 @@ import (
 	"database/sql"
 	"math"
 	"math/rand"
-	"os"
 	"testing"
 	"time"
 
-	rand2 "bitbucket.org/MaVo159/rand"
 	_ "github.com/mxk/go-sqlite/sqlite3"
 	"github.com/rwcarlsen/optim"
 	"github.com/rwcarlsen/optim/bench"
@@ -38,55 +36,98 @@ func seedrng(seed int64) {
 	optim.Rand = rand.New(rand.NewSource(seed))
 }
 
+func testbench(t *testing.T, fn bench.Func, sfn func() *optim.Solver, successfrac, avgiter float64) {
+	t.Logf("[%v] optimum == %v, expect <= %v", fn.Name(), fn.Optima()[0].Val, fn.Tol())
+
+	nrun := 20
+	neval := 0
+	niter := 0
+	nsuccess := 0
+	sum := 0.0
+	for i := 0; i < nrun; i++ {
+		s := sfn()
+
+		for s.Next() {
+			if s.Best().Val < fn.Tol() {
+				break
+			}
+		}
+		if err := s.Err(); err != nil {
+			t.Errorf("    %v", err)
+		}
+
+		neval += s.Neval()
+		niter += s.Niter()
+		sum += s.Best().Val
+		if s.Best().Val < fn.Tol() {
+			nsuccess++
+		}
+	}
+
+	frac := float64(nsuccess) / float64(nrun)
+	if frac < successfrac {
+		t.Errorf("    only found good solutions in %v/%v runs - want >= %v/%v", nsuccess, nrun, math.Ceil(successfrac*float64(nrun)), nrun)
+	} else {
+		t.Logf("    found good solutions in %v/%v runs", nsuccess, nrun)
+	}
+
+	t.Logf("    average best objective is %v", sum/float64(nrun))
+
+	gotavg := float64(niter) / float64(nrun)
+	if gotavg > avgiter {
+		t.Errorf("    took too many iterations: want %v, averaged %v", avgiter, gotavg)
+	} else {
+		t.Logf("    averaged %v iterations", gotavg)
+	}
+}
+
 func TestBenchSwarmRosen(t *testing.T) {
-	optim.Rand = rand2.New(rand2.NewMersenneTwister(seed))
 	seedrng(seed)
 
 	ndim := 30
 	npar := 30
-	nrun := 20
 	maxiter := 10000
 
-	os.Remove("rosenbench.sqlite")
-	db, _ := sql.Open("sqlite3", "rosenbench.sqlite")
-	defer db.Close()
-	db = nil
-
 	fn := bench.Rosenbrock{ndim}
-
-	nsuccess := 0
-	neval := 0
-	niter := 0
-	sum := 0.0
-	for i := 0; i < nrun; i++ {
-		it, m := swarmsolver(fn, db, npar)
-		//it, m := pswarmsolver(fn, db, npar, false)
-		solv := &optim.Solver{
+	sfn := func() *optim.Solver {
+		it, m := swarmsolver(fn, nil, npar)
+		return &optim.Solver{
 			Iter:    it,
 			Obj:     optim.Func(fn.Eval),
 			Mesh:    m,
 			MaxEval: maxiter * npar,
 			MaxIter: maxiter,
 		}
+	}
 
-		for solv.Next() {
-			if solv.Best().Val < 100 {
-				break
-			}
-		}
-		neval += solv.Neval()
-		niter += solv.Niter()
-		sum += solv.Best().Val
-		if solv.Best().Val < 100 {
-			nsuccess++
+	successfrac := 0.90
+	avgiter := 4000.0
+	testbench(t, fn, sfn, successfrac, avgiter)
+}
+
+func TestBenchPSwarmRosen(t *testing.T) {
+	seedrng(seed)
+
+	ndim := 30
+	npar := 30
+	maxiter := 10000
+
+	fn := bench.Rosenbrock{ndim}
+	sfn := func() *optim.Solver {
+		it, m := pswarmsolver(fn, nil, npar, false)
+		return &optim.Solver{
+			Iter:    it,
+			Obj:     optim.Func(fn.Eval),
+			Mesh:    m,
+			MaxEval: maxiter * npar,
+			MaxIter: maxiter,
 		}
 	}
 
-	t.Logf("[%v] optimum == %v, expect <= 100", fn.Name(), fn.Optima()[0].Val)
-	t.Logf("  success rate is %v/%v (%v%%) - averaged %v", nsuccess, nrun, float64(nsuccess)/float64(nrun)*100, sum/float64(nrun))
-	t.Logf("  averaged %v iter and %v evals", float64(niter)/float64(nrun), float64(neval)/float64(nrun))
+	successfrac := 0.90
+	avgiter := 2500.0
+	testbench(t, fn, sfn, successfrac, avgiter)
 }
-
 func TestPattern(t *testing.T) {
 	for _, fn := range bench.AllFuncs {
 		//db, _ := sql.Open("sqlite3", fn.Name()+".sqlite")
