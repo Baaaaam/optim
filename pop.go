@@ -1,39 +1,41 @@
-package pop
+package optim
 
 import (
 	"math"
 
 	"github.com/gonum/matrix/mat64"
 	"github.com/petar/GoLLRB/llrb"
-	"github.com/rwcarlsen/optim"
 )
 
-// New uses
-func New(n int, low, up []float64) []optim.Point {
+// RandPop generates n randomly positioned points in the boxed bounds defined by
+// low and up.  The number of dimensions is equal to len(low).  Returned
+// points have their values initialized to +infinity.
+func RandPop(n int, low, up []float64) []Point {
 	if len(low) != len(up) {
 		panic("low and up vectors are not same length")
 	}
 
 	ndims := len(low)
 
-	points := make([]optim.Point, n)
+	points := make([]Point, n)
 	for i := 0; i < n; i++ {
 		pos := make([]float64, ndims)
 		for j := range pos {
-			pos[j] = low[j] + optim.RandFloat()*(up[j]-low[j])
+			pos[j] = low[j] + RandFloat()*(up[j]-low[j])
 		}
-		points[i] = optim.NewPoint(pos, math.Inf(1))
+		points[i] = NewPoint(pos, math.Inf(1))
 	}
 	return points
 }
 
-type item struct {
-	optim.Point
+// populitem implements llrb.Item interface for use in RandPopConstr
+type populitem struct {
+	Point
 	howbad float64
 }
 
-func (p1 item) Less(than llrb.Item) bool {
-	p2 := than.(item)
+func (p1 populitem) Less(than llrb.Item) bool {
+	p2 := than.(populitem)
 	return p1.howbad < p2.howbad
 }
 
@@ -42,23 +44,23 @@ func (p1 item) Less(than llrb.Item) bool {
 // and upper box bounds for the variables.  NewConstr generates random points
 // within the box bounds and keeps all feasible points.  It queues up the
 // least unfavorable infeasible points in case n feasible ones cannot be found
-// within maxiter.  github.com/rwcarlsen/optim.Rand is used for random
+// within maxiter.  Rand is used for random
 // numbers.
-func NewConstr(n, maxiter int, lb, ub []float64, low, A, up *mat64.Dense) (points []optim.Point, nbad, iter int) {
-	stackA, b, ranges := optim.StackConstr(low, A, up)
+func RandPopConstr(n, maxiter int, lb, ub []float64, low, A, up *mat64.Dense) (points []Point, nbad, iter int) {
+	stackA, b, ranges := StackConstr(low, A, up)
 
 	_, ndims := A.Dims()
 
 	violaters := llrb.New()
-	points = make([]optim.Point, 0, n)
+	points = make([]Point, 0, n)
 	for i := 0; i < maxiter; i++ {
 		// create point
 		pos := make([]float64, ndims)
 		for j := range pos {
 			l, u := lb[j], ub[j]
-			pos[j] = l + optim.RandFloat()*(u-l)
+			pos[j] = l + RandFloat()*(u-l)
 		}
-		p := optim.NewPoint(pos, math.Inf(1))
+		p := NewPoint(pos, math.Inf(1))
 
 		// check for constraint violations
 		ax := &mat64.Dense{}
@@ -79,7 +81,7 @@ func NewConstr(n, maxiter int, lb, ub []float64, low, A, up *mat64.Dense) (point
 			}
 		} else {
 			// add to tree
-			violaters.InsertNoReplace(item{p, howbad})
+			violaters.InsertNoReplace(populitem{p, howbad})
 			for violaters.Len() > n-len(points) {
 				violaters.DeleteMax()
 			}
@@ -88,7 +90,7 @@ func NewConstr(n, maxiter int, lb, ub []float64, low, A, up *mat64.Dense) (point
 
 	nbad = n - len(points)
 	for len(points) < n {
-		p := violaters.DeleteMin().(item).Point
+		p := violaters.DeleteMin().(populitem).Point
 		points = append(points, p)
 	}
 

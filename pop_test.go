@@ -1,4 +1,4 @@
-package pop
+package optim
 
 import (
 	"testing"
@@ -6,7 +6,7 @@ import (
 	"github.com/gonum/matrix/mat64"
 )
 
-func TestNewConstr(t *testing.T) {
+func TestRandPopConstr(t *testing.T) {
 	n := 100
 	maxiter := 100000
 	lb := []float64{0, 0, 0, 0, 0}
@@ -21,7 +21,7 @@ func TestNewConstr(t *testing.T) {
 	A := mat64.NewDense(1, 5, []float64{1, 1, 0, 0, 0})
 	prob := .005
 
-	points, nbad, iter := NewConstr(n, maxiter, lb, ub, low, A, up)
+	points, nbad, iter := RandPopConstr(n, maxiter, lb, ub, low, A, up)
 
 	if nbad > 0 {
 		t.Errorf("got %v bad points", nbad)
@@ -48,10 +48,10 @@ func TestNewConstr(t *testing.T) {
 	t.Logf("avg of (x1+x2/2) == %v", avg)
 }
 
-// TestNewConstrBad makes sure that in the event that we cannot supply all
-// feasible points within maxiter that NewConstr correctly favors points that
+// TestRandPopConstr_Bad makes sure that in the event that we cannot supply all
+// feasible points within maxiter that RandPopConstr correctly favors points that
 // violate constraints less.
-func TestNewConstrBad(t *testing.T) {
+func TestRandPopConstr_Bad(t *testing.T) {
 	n := 100
 	maxiter := 10000
 	lb := []float64{0, 0, 0, 0, 0}
@@ -70,7 +70,7 @@ func TestNewConstrBad(t *testing.T) {
 	// maxiter == n / prob / 2
 	expbad := int(float64(n) * float64(maxiter) / (float64(n) / prob))
 
-	points, nbad, iter := NewConstr(n, maxiter, lb, ub, low, A, up)
+	points, nbad, iter := RandPopConstr(n, maxiter, lb, ub, low, A, up)
 
 	if nbad < expbad-10 || nbad > expbad+10 {
 		t.Errorf("got %v bad points, expected ~%v", nbad, expbad)

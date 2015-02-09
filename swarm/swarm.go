@@ -7,7 +7,6 @@ import (
 
 	"github.com/rwcarlsen/optim"
 	"github.com/rwcarlsen/optim/mesh"
-	"github.com/rwcarlsen/optim/pop"
 )
 
 // These params are calculated using a constriction factor originally
@@ -116,7 +115,7 @@ func NewPopulation(points []optim.Point, vmax []float64) Population {
 // NewPopulationRand creates a population of randomly positioned particles
 // uniformly distributed in the box-bounds described by low and up.
 func NewPopulationRand(n int, low, up []float64) Population {
-	points := pop.New(n, low, up)
+	points := optim.RandPop(n, low, up)
 	return NewPopulation(points, vmaxfrombounds(low, up))
 }
 
