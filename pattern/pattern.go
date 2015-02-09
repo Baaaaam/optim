@@ -27,9 +27,14 @@ func NsuccessGrow(n int) Option {
 	}
 }
 
-func SearchIter(it optim.Iterator) Option {
+const (
+	Share   = true
+	NoShare = false
+)
+
+func SearchIter(it optim.Iterator, share bool) Option {
 	return func(iter *Iterator) {
-		iter.Searcher = &WrapSearcher{Iter: it}
+		iter.Searcher = &WrapSearcher{Iter: it, Share: share}
 	}
 }
 
@@ -303,13 +308,13 @@ func (_ NullSearcher) Search(o optim.Objectiver, m mesh.Mesh, curr optim.Point) 
 
 type WrapSearcher struct {
 	Iter optim.Iterator
-	// AddCurr specifies whether to add the current best point to the
+	// Share specifies whether to add the current best point to the
 	// searcher's underlying Iterator before performing the search.
-	AddCurr bool
+	Share bool
 }
 
 func (s *WrapSearcher) Search(o optim.Objectiver, m mesh.Mesh, curr optim.Point) (success bool, best optim.Point, n int, err error) {
-	if s.AddCurr {
+	if s.Share {
 		s.Iter.AddPoint(curr)
 	}
 	best, n, err = s.Iter.Iterate(o, m)

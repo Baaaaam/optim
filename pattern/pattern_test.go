@@ -17,7 +17,7 @@ func TestDb(t *testing.T) {
 	}
 	defer db.Close()
 
-	fn := bench.AllFuncs[0]
+	fn := bench.Basic[0]
 	optimum := fn.Optima()[0].Val
 	it, m := patternsolver(fn, db)
 

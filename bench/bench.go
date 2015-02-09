@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"math/rand"
 	"testing"
 
 	"github.com/rwcarlsen/optim"
@@ -20,18 +21,18 @@ var (
 	sqrt = math.Sqrt
 )
 
-var AllFuncs = []Func{
+var Basic = []Func{
 	Ackley{},
 	CrossTray{},
-	Eggholder{},
+	//Eggholder{},
 	HolderTable{},
 	Schaffer2{},
-	Styblinski{NDim: 2},
-	Styblinski{NDim: 30},
-	Styblinski{NDim: 100},
 	Rosenbrock{NDim: 2},
-	Rosenbrock{NDim: 30},
-	Rosenbrock{NDim: 100},
+	Rosenbrock{NDim: 10},
+	Griewank{NDim: 2},
+	//Griewank{NDim: 10},
+	Rastrigrin{NDim: 2},
+	Rastrigrin{NDim: 10},
 }
 
 type Func interface {
@@ -222,6 +223,80 @@ func (fn Styblinski) Optima() []optim.Point {
 	}
 }
 
+type Rastrigrin struct {
+	NDim int
+}
+
+func (fn Rastrigrin) Name() string { return fmt.Sprintf("Rastrigrin_%vD", fn.NDim) }
+
+func (fn Rastrigrin) Tol() float64 { return 5.0 / 3.0 * float64(fn.NDim) }
+
+func (fn Rastrigrin) Eval(x []float64) float64 {
+	if !InsideBounds(x, fn) {
+		return math.Inf(1)
+	}
+
+	tot := 10.0 * float64(fn.NDim)
+	for i := 0; i < fn.NDim; i++ {
+		tot += x[i]*x[i] - 10*math.Cos(2*math.Pi*x[i])
+	}
+	return tot
+}
+
+func (fn Rastrigrin) Bounds() (low, up []float64) {
+	low = make([]float64, fn.NDim)
+	up = make([]float64, fn.NDim)
+	for i := range low {
+		low[i] = -5.12
+		up[i] = 5.12
+	}
+	return low, up
+}
+
+func (fn Rastrigrin) Optima() []optim.Point {
+	return []optim.Point{
+		optim.NewPoint(make([]float64, fn.NDim), 0),
+	}
+}
+
+type Griewank struct {
+	NDim int
+}
+
+func (fn Griewank) Name() string { return fmt.Sprintf("Griewank_%vD", fn.NDim) }
+
+func (fn Griewank) Tol() float64 { return .1 } //return .1/ 30.0 * float64(fn.NDim) }
+
+func (fn Griewank) Eval(x []float64) float64 {
+	if !InsideBounds(x, fn) {
+		return math.Inf(1)
+	}
+
+	sum := 0.0
+	prod := 1.0
+	for i := 0; i < fn.NDim; i++ {
+		sum += x[i] * x[i]
+		prod *= math.Cos(x[i] / math.Sqrt(float64(i+1)))
+	}
+	return 1 + sum/4000 - prod
+}
+
+func (fn Griewank) Bounds() (low, up []float64) {
+	low = make([]float64, fn.NDim)
+	up = make([]float64, fn.NDim)
+	for i := range low {
+		low[i] = -600
+		up[i] = 600
+	}
+	return low, up
+}
+
+func (fn Griewank) Optima() []optim.Point {
+	return []optim.Point{
+		optim.NewPoint(make([]float64, fn.NDim), 0),
+	}
+}
+
 type Rosenbrock struct {
 	NDim int
 }
@@ -263,21 +338,53 @@ func (fn Rosenbrock) Optima() []optim.Point {
 	}
 }
 
-func Benchmark(t *testing.T, solv *optim.Solver, fn Func) {
-	for solv.Next() {
-		if solv.Best().Val < fn.Tol() {
-			break
+// BenchSeed is the seed value used to initialize optim.Rand for each batch of
+// optimization runs performed by the Benchmark function.
+var BenchSeed int64 = 7
+
+// Benchmark performs several optimization runs using sfn to generate
+// set up problems for each run.  It uses fn as the objective and performs
+// tests confirming that at least some successfrac of runs achieved better
+// than fn's tolerance for optimum in less than avgiter iterations. Results
+// are logged to t.
+func Benchmark(t *testing.T, fn Func, sfn func() *optim.Solver, successfrac, avgiter float64) {
+	optim.Rand = rand.New(rand.NewSource(BenchSeed))
+	nrun := 20
+	neval := 0
+	niter := 0
+	nsuccess := 0
+	sum := 0.0
+	for i := 0; i < nrun; i++ {
+		s := sfn()
+
+		for s.Next() {
+			if s.Best().Val < fn.Tol() {
+				break
+			}
+		}
+		if err := s.Err(); err != nil {
+			t.Errorf("[%v:ERROR] %v", fn.Name(), err)
+		}
+
+		neval += s.Neval()
+		niter += s.Niter()
+		sum += s.Best().Val
+		if s.Best().Val < fn.Tol() {
+			nsuccess++
 		}
 	}
-	err := solv.Err()
 
-	optim := fn.Optima()[0].Val
-	if err != nil {
-		t.Errorf("[ERROR:%v] %v", fn.Name(), err)
-	} else if v := solv.Best().Val; v < fn.Tol() {
-		t.Logf("[pass:%v] %v evals (%v iter): want %v, got %v", fn.Name(), solv.Neval(), solv.Niter(), optim, v)
-	} else {
-		t.Errorf("[FAIL:%v] %v evals (%v iter): want %v, got %v", fn.Name(), solv.Neval(), solv.Niter(), optim, v)
+	frac := float64(nsuccess) / float64(nrun)
+	gotavg := float64(niter) / float64(nrun)
+
+	t.Logf("[%v] %v/%v runs, %v iters, %v evals, want < %.3f, averaged %.3f", fn.Name(), nsuccess, nrun, gotavg, neval/nrun, fn.Tol(), sum/float64(nrun))
+
+	if frac < successfrac {
+		t.Errorf("    FAIL: only %v/%v runs succeeded, want %v/%v", nsuccess, nrun, math.Ceil(successfrac*float64(nrun)), nrun)
+	}
+
+	if gotavg > avgiter {
+		t.Errorf("    FAIL: too many iterations: want %v, averaged %.2f", avgiter, gotavg)
 	}
 }
 

@@ -50,6 +50,9 @@ func (s *Solver) Run() error {
 }
 
 func (s *Solver) Next() (more bool) {
+	if s.Mesh == nil {
+		s.Mesh = &mesh.Infinite{}
+	}
 	if s.niter == 0 {
 		s.best.Val = math.Inf(1)
 	}

@@ -186,7 +186,7 @@ func KillDist(dist float64) Option {
 	}
 }
 
-func VelUpdParams(cognition, social float64) Option {
+func LearnFactors(cognition, social float64) Option {
 	return func(it *Iterator) {
 		it.Cognition = cognition
 		it.Social = social

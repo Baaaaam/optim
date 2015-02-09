@@ -5,7 +5,6 @@ import (
 	"math"
 	"math/rand"
 	"testing"
-	"time"
 
 	_ "github.com/mxk/go-sqlite/sqlite3"
 	"github.com/rwcarlsen/optim"
@@ -13,11 +12,6 @@ import (
 	"github.com/rwcarlsen/optim/mesh"
 	"github.com/rwcarlsen/optim/pattern"
 	"github.com/rwcarlsen/optim/swarm"
-)
-
-const (
-	cache   = true
-	nocache = false
 )
 
 const (
@@ -29,92 +23,37 @@ const (
 
 const seed = 7
 
-func seedrng(seed int64) {
-	if seed < 0 {
-		seed = time.Now().Unix()
-	}
-	optim.Rand = rand.New(rand.NewSource(seed))
-}
-
-func testbench(t *testing.T, fn bench.Func, sfn func() *optim.Solver, successfrac, avgiter float64) {
-	t.Logf("[%v] optimum == %v, expect <= %v", fn.Name(), fn.Optima()[0].Val, fn.Tol())
-
-	nrun := 20
-	neval := 0
-	niter := 0
-	nsuccess := 0
-	sum := 0.0
-	for i := 0; i < nrun; i++ {
-		s := sfn()
-
-		for s.Next() {
-			if s.Best().Val < fn.Tol() {
-				break
-			}
-		}
-		if err := s.Err(); err != nil {
-			t.Errorf("    %v", err)
-		}
-
-		neval += s.Neval()
-		niter += s.Niter()
-		sum += s.Best().Val
-		if s.Best().Val < fn.Tol() {
-			nsuccess++
-		}
-	}
-
-	frac := float64(nsuccess) / float64(nrun)
-	if frac < successfrac {
-		t.Errorf("    only found good solutions in %v/%v runs - want >= %v/%v", nsuccess, nrun, math.Ceil(successfrac*float64(nrun)), nrun)
-	} else {
-		t.Logf("    found good solutions in %v/%v runs", nsuccess, nrun)
-	}
-
-	t.Logf("    average best objective is %v", sum/float64(nrun))
-
-	gotavg := float64(niter) / float64(nrun)
-	if gotavg > avgiter {
-		t.Errorf("    took too many iterations: want %v, averaged %v", avgiter, gotavg)
-	} else {
-		t.Logf("    averaged %v iterations", gotavg)
-	}
-}
+func init() { bench.BenchSeed = seed }
 
 func TestBenchSwarmRosen(t *testing.T) {
-	seedrng(seed)
-
 	ndim := 30
 	npar := 30
 	maxiter := 10000
+	successfrac := 0.90
+	avgiter := 4000.0
 
 	fn := bench.Rosenbrock{ndim}
 	sfn := func() *optim.Solver {
-		it, m := swarmsolver(fn, nil, npar)
 		return &optim.Solver{
-			Iter:    it,
+			Iter:    swarmsolver(fn, nil, npar),
 			Obj:     optim.Func(fn.Eval),
-			Mesh:    m,
 			MaxEval: maxiter * npar,
 			MaxIter: maxiter,
 		}
 	}
-
-	successfrac := 0.90
-	avgiter := 4000.0
-	testbench(t, fn, sfn, successfrac, avgiter)
+	bench.Benchmark(t, fn, sfn, successfrac, avgiter)
 }
 
 func TestBenchPSwarmRosen(t *testing.T) {
-	seedrng(seed)
-
 	ndim := 30
 	npar := 30
 	maxiter := 10000
+	successfrac := 0.90
+	avgiter := 2500.0
 
 	fn := bench.Rosenbrock{ndim}
 	sfn := func() *optim.Solver {
-		it, m := pswarmsolver(fn, nil, npar, false)
+		it, m := pswarmsolver(fn, nil, npar)
 		return &optim.Solver{
 			Iter:    it,
 			Obj:     optim.Func(fn.Eval),
@@ -123,80 +62,68 @@ func TestBenchPSwarmRosen(t *testing.T) {
 			MaxIter: maxiter,
 		}
 	}
+	bench.Benchmark(t, fn, sfn, successfrac, avgiter)
+}
 
+func TestOverviewPattern(t *testing.T) {
+	maxeval := 50000
+	maxiter := 5000
+	successfrac := 0.30
+	avgiter := 3500.0
+
+	// ONLY test plain pattern search on convex functions
+	for _, fn := range []bench.Func{bench.Rosenbrock{NDim: 2}} {
+		sfn := func() *optim.Solver {
+			it, m := patternsolver(fn, nil)
+			return &optim.Solver{
+				Iter:    it,
+				Obj:     optim.Func(fn.Eval),
+				Mesh:    m,
+				MaxIter: maxiter,
+				MaxEval: maxeval,
+			}
+		}
+		bench.Benchmark(t, fn, sfn, successfrac, avgiter)
+	}
+}
+
+func TestOverviewSwarm(t *testing.T) {
+	maxeval := 50000
+	maxiter := 5000
 	successfrac := 0.90
-	avgiter := 2500.0
-	testbench(t, fn, sfn, successfrac, avgiter)
-}
-func TestPattern(t *testing.T) {
-	for _, fn := range bench.AllFuncs {
-		//db, _ := sql.Open("sqlite3", fn.Name()+".sqlite")
-		seedrng(seed)
-		it, m := patternsolver(fn, nil)
-		solv := &optim.Solver{
-			Iter:         it,
-			Obj:          optim.Func(fn.Eval),
-			Mesh:         m,
-			MaxIter:      maxiter,
-			MaxEval:      maxeval,
-			MaxNoImprove: maxnoimprove,
-			MinStep:      minstep,
-		}
+	avgiter := 500.0
 
-		bench.Benchmark(t, solv, fn)
+	for _, fn := range bench.Basic {
+		sfn := func() *optim.Solver {
+			return &optim.Solver{
+				Iter:    swarmsolver(fn, nil, -1),
+				Obj:     optim.Func(fn.Eval),
+				MaxEval: maxeval,
+				MaxIter: maxiter,
+			}
+		}
+		bench.Benchmark(t, fn, sfn, successfrac, avgiter)
 	}
 }
 
-func TestSwarm(t *testing.T) {
-	for _, fn := range bench.AllFuncs {
-		seedrng(seed)
-		it, m := swarmsolver(fn, nil, -1)
-		solv := &optim.Solver{
-			Iter:         it,
-			Obj:          optim.Func(fn.Eval),
-			Mesh:         m,
-			MaxIter:      maxiter,
-			MaxEval:      maxeval,
-			MaxNoImprove: maxnoimprove,
+func TestOverviewPSwarm(t *testing.T) {
+	maxeval := 50000
+	maxiter := 5000
+	successfrac := 0.90
+	avgiter := 250.0
+
+	for _, fn := range bench.Basic {
+		sfn := func() *optim.Solver {
+			it, m := pswarmsolver(fn, nil, -1)
+			return &optim.Solver{
+				Iter:    it,
+				Obj:     optim.Func(fn.Eval),
+				Mesh:    m,
+				MaxEval: maxeval,
+				MaxIter: maxiter,
+			}
 		}
-
-		bench.Benchmark(t, solv, fn)
-	}
-}
-
-func TestPSwarm(t *testing.T) {
-	for _, fn := range bench.AllFuncs {
-		seedrng(seed)
-		it, m := pswarmsolver(fn, nil, -1, nocache)
-		solv := &optim.Solver{
-			Iter:         it,
-			Obj:          optim.Func(fn.Eval),
-			Mesh:         m,
-			MaxIter:      maxiter,
-			MaxEval:      maxeval,
-			MaxNoImprove: maxnoimprove,
-			MinStep:      minstep,
-		}
-
-		bench.Benchmark(t, solv, fn)
-	}
-}
-
-func TestPSwarmCache(t *testing.T) {
-	for _, fn := range bench.AllFuncs {
-		seedrng(seed)
-		it, m := pswarmsolver(fn, nil, -1, cache)
-		solv := &optim.Solver{
-			Iter:         it,
-			Obj:          optim.Func(fn.Eval),
-			Mesh:         m,
-			MaxIter:      maxiter,
-			MaxEval:      maxeval,
-			MaxNoImprove: maxnoimprove,
-			MinStep:      minstep,
-		}
-
-		bench.Benchmark(t, solv, fn)
+		bench.Benchmark(t, fn, sfn, successfrac, avgiter)
 	}
 }
 
@@ -212,9 +139,8 @@ func patternsolver(fn bench.Func, db *sql.DB) (optim.Iterator, mesh.Mesh) {
 	return it, m
 }
 
-func swarmsolver(fn bench.Func, db *sql.DB, n int) (optim.Iterator, mesh.Mesh) {
+func swarmsolver(fn bench.Func, db *sql.DB, n int, opts ...swarm.Option) optim.Iterator {
 	low, up := fn.Bounds()
-	m := &mesh.Infinite{StepSize: 0}
 
 	if n < 0 {
 		n = 30 + 1*len(low)
@@ -223,39 +149,35 @@ func swarmsolver(fn bench.Func, db *sql.DB, n int) (optim.Iterator, mesh.Mesh) {
 		}
 	}
 
-	//c := 2.01
-	//k := swarm.Constriction(c, c)
-
-	pop := swarm.NewPopulationRand(n, low, up)
-	it := swarm.NewIterator(nil, pop,
+	opts = append(opts,
 		swarm.VmaxBounds(fn.Bounds()),
 		swarm.DB(db),
-		//swarm.VelUpdParams(k*c, k*c),
-		//swarm.FixedInertia(k),
 	)
-	return it, m
+
+	pop := swarm.NewPopulationRand(n, low, up)
+	it := swarm.NewIterator(nil, pop, opts...)
+	return it
 }
 
-func pswarmsolver(fn bench.Func, db *sql.DB, n int, cache bool) (optim.Iterator, mesh.Mesh) {
+func pswarmsolver(fn bench.Func, db *sql.DB, n int, opts ...pattern.Option) (optim.Iterator, mesh.Mesh) {
 	low, up := fn.Bounds()
 	max, min := up[0], low[0]
 	m := &mesh.Infinite{StepSize: (max - min) / 10}
 
-	var ev optim.Evaler = optim.NewCacheEvaler(optim.SerialEvaler{})
-	if !cache {
-		ev = optim.SerialEvaler{}
-	}
+	ev := optim.SerialEvaler{}
 
-	swarm, _ := swarmsolver(fn, db, n)
+	swarm := swarmsolver(fn, db, n)
 
 	p := initialpoint(fn)
 	m.SetOrigin(p.Pos())
 
-	it := pattern.NewIterator(ev, p,
-		pattern.SearchIter(swarm),
+	opts = append(opts,
+		pattern.SearchIter(swarm, pattern.NoShare),
 		pattern.ContinuousSearch,
 		pattern.DB(db),
 	)
+
+	it := pattern.NewIterator(ev, p, opts...)
 	return it, m
 }
 
