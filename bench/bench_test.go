@@ -65,6 +65,48 @@ func TestBenchPSwarmRosen(t *testing.T) {
 	bench.Benchmark(t, fn, sfn, successfrac, avgiter)
 }
 
+func TestBenchPSwarmGriewank(t *testing.T) {
+	ndim := 30
+	npar := 30
+	maxiter := 10000
+	successfrac := 1.00
+	avgiter := 300.0
+
+	fn := bench.Griewank{ndim}
+	sfn := func() *optim.Solver {
+		it, m := pswarmsolver(fn, nil, npar)
+		return &optim.Solver{
+			Iter:    it,
+			Obj:     optim.Func(fn.Eval),
+			Mesh:    m,
+			MaxEval: maxiter * npar,
+			MaxIter: maxiter,
+		}
+	}
+	bench.Benchmark(t, fn, sfn, successfrac, avgiter)
+}
+
+func TestBenchPSwarmRastrigrin(t *testing.T) {
+	ndim := 30
+	npar := 30
+	maxiter := 10000
+	successfrac := 1.00
+	avgiter := 300.0
+
+	fn := bench.Rastrigrin{ndim}
+	sfn := func() *optim.Solver {
+		it, m := pswarmsolver(fn, nil, npar)
+		return &optim.Solver{
+			Iter:    it,
+			Obj:     optim.Func(fn.Eval),
+			Mesh:    m,
+			MaxEval: maxiter * npar,
+			MaxIter: maxiter,
+		}
+	}
+	bench.Benchmark(t, fn, sfn, successfrac, avgiter)
+}
+
 func TestOverviewPattern(t *testing.T) {
 	maxeval := 50000
 	maxiter := 5000
@@ -109,8 +151,8 @@ func TestOverviewSwarm(t *testing.T) {
 func TestOverviewPSwarm(t *testing.T) {
 	maxeval := 50000
 	maxiter := 5000
-	successfrac := 1.00
-	avgiter := 150.00
+	successfrac := .90
+	avgiter := 200.00
 
 	for _, fn := range bench.Basic {
 		sfn := func() *optim.Solver {

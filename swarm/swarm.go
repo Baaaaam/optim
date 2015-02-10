@@ -419,8 +419,10 @@ func panicif(err error) {
 func vmaxfrombounds(low, up []float64) []float64 {
 	vmax := make([]float64, len(low))
 	for i := range vmax {
-		// Eberhart et al. suggest this: (up-low)/2
-		vmax[i] = (up[i] - low[i]) / 2
+		// Eberhart et al. suggest this: (up-low)/2 - removing divide by two
+		// seems to help swarm avoid premature convergence in difficult
+		// problems.
+		vmax[i] = (up[i] - low[i])
 	}
 	return vmax
 }
