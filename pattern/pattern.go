@@ -38,8 +38,8 @@ func SearchIter(it optim.Iterator, share bool) Option {
 	}
 }
 
-func ContinuousSearch(it *Iterator) {
-	it.ContinuousSearch = true
+func DiscreteSearch(it *Iterator) {
+	it.DiscreteSearch = true
 }
 
 func DB(db *sql.DB) Option {
@@ -49,15 +49,15 @@ func DB(db *sql.DB) Option {
 }
 
 type Iterator struct {
-	ev               optim.Evaler
-	Poller           Poller
-	Searcher         Searcher
-	curr             optim.Point
-	ContinuousSearch bool // true to not project search points onto poll step size mesh
-	NsuccessGrow     int  // number of successive successful polls before growing mesh
-	nsuccess         int  // (internal) number of successive successful polls
-	Db               *sql.DB
-	count            int
+	ev             optim.Evaler
+	Poller         Poller
+	Searcher       Searcher
+	curr           optim.Point
+	DiscreteSearch bool // true to project search points onto poll step size mesh
+	NsuccessGrow   int  // number of successive successful polls before growing mesh
+	nsuccess       int  // (internal) number of successive successful polls
+	Db             *sql.DB
+	count          int
 }
 
 func NewIterator(e optim.Evaler, start optim.Point, opts ...Option) *Iterator {
@@ -156,7 +156,7 @@ func (it *Iterator) Iterate(o optim.Objectiver, m mesh.Mesh) (best optim.Point, 
 	it.count++
 
 	prevstep := m.Step()
-	if it.ContinuousSearch {
+	if !it.DiscreteSearch {
 		m.SetStep(0)
 	}
 

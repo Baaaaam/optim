@@ -178,7 +178,6 @@ func pswarmsolver(fn bench.Func, db *sql.DB, n int, opts ...pattern.Option) (opt
 
 	opts = append(opts,
 		pattern.SearchIter(swarm, pattern.NoShare),
-		pattern.ContinuousSearch,
 		pattern.DB(db),
 	)
 
