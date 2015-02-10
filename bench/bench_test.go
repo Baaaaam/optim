@@ -214,7 +214,7 @@ func pswarmsolver(fn bench.Func, db *sql.DB, n int, opts ...pattern.Option) (opt
 	m.SetOrigin(p.Pos())
 
 	opts = append(opts,
-		pattern.SearchIter(swarm, pattern.NoShare),
+		pattern.SearchIter(swarm, pattern.Share),
 		pattern.DB(db),
 	)
 
