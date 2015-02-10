@@ -149,14 +149,9 @@ func swarmsolver(fn bench.Func, db *sql.DB, n int, opts ...swarm.Option) optim.I
 		}
 	}
 
-	c := 2.05
-	k := swarm.Constriction(c, c)
-
 	opts = append(opts,
 		swarm.VmaxBounds(fn.Bounds()),
 		swarm.DB(db),
-		swarm.LearnFactors(k*c, k*c),
-		swarm.FixedInertia(k),
 	)
 
 	pop := swarm.NewPopulationRand(n, low, up)
