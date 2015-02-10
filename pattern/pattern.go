@@ -244,7 +244,7 @@ func (cp *CompassPoller) Poll(obj optim.Objectiver, ev optim.Evaler, m mesh.Mesh
 	if h != cp.prevhash || cp.prevstep != m.Step() {
 		// TODO: write test that checks we poll compass dirs again if only mesh
 		// step changed (and not from point)
-		pollpoints = append(pollpoints, genPollPoints(from, CompassNp1, m)...)
+		pollpoints = append(pollpoints, genPollPoints(from, Compass2N, m)...)
 		pollpoints = append(pollpoints, genPollPoints(from, RandomN(from.Len()), m)...)
 		cp.prevhash = h
 	} else {
