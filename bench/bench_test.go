@@ -30,7 +30,7 @@ func TestBenchSwarmRosen(t *testing.T) {
 	npar := 30
 	maxiter := 10000
 	successfrac := 1.00
-	avgiter := 500.0
+	avgiter := 600.0
 
 	fn := bench.Rosenbrock{ndim}
 	sfn := func() *optim.Solver {
@@ -110,7 +110,7 @@ func TestOverviewPSwarm(t *testing.T) {
 	maxeval := 50000
 	maxiter := 5000
 	successfrac := 1.00
-	avgiter := 100.0
+	avgiter := 150.00
 
 	for _, fn := range bench.Basic {
 		sfn := func() *optim.Solver {

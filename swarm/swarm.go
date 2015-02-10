@@ -419,9 +419,8 @@ func panicif(err error) {
 func vmaxfrombounds(low, up []float64) []float64 {
 	vmax := make([]float64, len(low))
 	for i := range vmax {
-		// Eberhart et al. suggest (up-low)/2, but (up-low)/4 seems to work
-		// better for me on 30D Rosenbrock benchmark.
-		vmax[i] = (up[i] - low[i]) / 4
+		// Eberhart et al. suggest this: (up-low)/2
+		vmax[i] = (up[i] - low[i]) / 2
 	}
 	return vmax
 }
