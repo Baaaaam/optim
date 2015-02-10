@@ -29,8 +29,8 @@ func TestBenchSwarmRosen(t *testing.T) {
 	ndim := 30
 	npar := 30
 	maxiter := 10000
-	successfrac := 0.90
-	avgiter := 4000.0
+	successfrac := 1.00
+	avgiter := 500.0
 
 	fn := bench.Rosenbrock{ndim}
 	sfn := func() *optim.Solver {
@@ -48,8 +48,8 @@ func TestBenchPSwarmRosen(t *testing.T) {
 	ndim := 30
 	npar := 30
 	maxiter := 10000
-	successfrac := 0.90
-	avgiter := 2500.0
+	successfrac := 1.00
+	avgiter := 400.0
 
 	fn := bench.Rosenbrock{ndim}
 	sfn := func() *optim.Solver {
@@ -90,8 +90,8 @@ func TestOverviewPattern(t *testing.T) {
 func TestOverviewSwarm(t *testing.T) {
 	maxeval := 50000
 	maxiter := 5000
-	successfrac := 0.90
-	avgiter := 500.0
+	successfrac := 1.00
+	avgiter := 250.0
 
 	for _, fn := range bench.Basic {
 		sfn := func() *optim.Solver {
@@ -109,8 +109,8 @@ func TestOverviewSwarm(t *testing.T) {
 func TestOverviewPSwarm(t *testing.T) {
 	maxeval := 50000
 	maxiter := 5000
-	successfrac := 0.90
-	avgiter := 250.0
+	successfrac := 1.00
+	avgiter := 100.0
 
 	for _, fn := range bench.Basic {
 		sfn := func() *optim.Solver {
@@ -149,9 +149,14 @@ func swarmsolver(fn bench.Func, db *sql.DB, n int, opts ...swarm.Option) optim.I
 		}
 	}
 
+	c := 2.05
+	k := swarm.Constriction(c, c)
+
 	opts = append(opts,
 		swarm.VmaxBounds(fn.Bounds()),
 		swarm.DB(db),
+		swarm.LearnFactors(k*c, k*c),
+		swarm.FixedInertia(k),
 	)
 
 	pop := swarm.NewPopulationRand(n, low, up)

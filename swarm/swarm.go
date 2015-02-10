@@ -16,17 +16,14 @@ import (
 //     adaptive particle swarm optimization” Proc. 1999 Congress on
 //     Evolutionary Computation, pp. 1951-1957
 //
-// The cognition and social parameters correspond to c1 and c2 values of 2.01
+// The cognition and social parameters correspond to c1 and c2 values of 2.05
 // that have been multiplied by their constriction coeffient - i.e.
-// DefaultSocial = Constriction(2.01, 2.01)*2.01.  DefaultInertia is set equal
-// to the constriction coefficient.  Eberhart, R.C.; Yuhui Shi report better
-// performance than my solver for 30D Rosenbrock using c1=c2=2.05, but my
-// solver performs much worse with those parameter values.  TODO: find out why.
-
+// DefaultSocial = Constriction(2.05, 2.05)*2.05.  DefaultInertia is set equal
+// to the constriction coefficient.
 const (
-	DefaultCognition = 1.7451333177369712
-	DefaultSocial    = 1.7451333177369712
-	DefaultInertia   = 0.8682255312124236
+	DefaultCognition = 1.496179765663133
+	DefaultSocial    = 1.496179765663133
+	DefaultInertia   = 0.7298437881283576
 )
 
 const (
@@ -60,14 +57,16 @@ type Particle struct {
 	Best optim.Point
 }
 
-func (p *Particle) Move(best optim.Point, vmax []float64, inertia, social, cognition float64) {
+func (p *Particle) Move(gbest optim.Point, vmax []float64, inertia, social, cognition float64) {
 	// update velocity
-	r1 := optim.RandFloat()
-	r2 := optim.RandFloat()
 	for i, currv := range p.Vel {
+		// random numbers r1 and r2 MUST go inside this loop and be generated
+		// uniquely for each dimension of p's velocity.
+		r1 := optim.RandFloat()
+		r2 := optim.RandFloat()
 		p.Vel[i] = inertia*currv +
 			cognition*r1*(p.Best.At(i)-p.At(i)) +
-			social*r2*(best.At(i)-p.At(i))
+			social*r2*(gbest.At(i)-p.At(i))
 		if math.Abs(p.Vel[i]) > vmax[i] {
 			p.Vel[i] = math.Copysign(vmax[i], p.Vel[i])
 		}
@@ -79,6 +78,20 @@ func (p *Particle) Move(best optim.Point, vmax []float64, inertia, social, cogni
 		pos[i] = p.At(i) + p.Vel[i]
 	}
 	p.Point = optim.NewPoint(pos, math.Inf(1))
+}
+
+func (p *Particle) Kill(gbest optim.Point, xtol, vtol float64) bool {
+	if xtol == 0 || vtol == 0 {
+		return false
+	}
+
+	totv := 0.0
+	diffx := 0.0
+	for i, v := range p.Vel {
+		totv += v * v
+		diffx += math.Pow(p.At(i)-gbest.At(i), 2)
+	}
+	return (totv < vtol*vtol) && (diffx < xtol*xtol)
 }
 
 func (p *Particle) Update(newp optim.Point) {
@@ -179,9 +192,10 @@ func DB(db *sql.DB) Option {
 	}
 }
 
-func KillDist(dist float64) Option {
+func KillTol(xtol, vtol float64) Option {
 	return func(it *Iterator) {
-		it.KillDist = dist
+		it.Xtol = xtol
+		it.Vtol = vtol
 	}
 }
 
@@ -215,11 +229,14 @@ func FixedInertia(v float64) Option {
 }
 
 type Iterator struct {
-	// KillDist is the distance from the global optimum below which particles
-	// are killed.  Zero for never killing particles.  Large values result in
-	// a particle being killed whenever it becomes the global optimum.
-	KillDist float64
-	Pop      Population
+	// Xtol is the distance from the global best under which particles are
+	// considered to removal.  This must occur simultaneously with the Vtol
+	// condition.
+	Xtol float64
+	// Vtol is the velocity under which particles are considered to removal.
+	// This must occur simultaneously with the Xtol condition.
+	Vtol float64
+	Pop  Population
 	optim.Evaler
 	Cognition float64
 	Social    float64
@@ -292,18 +309,17 @@ func (it *Iterator) Iterate(obj optim.Objectiver, m mesh.Mesh) (best optim.Point
 		p.Move(it.best, it.Vmax, it.InertiaFn(it.count), it.Social, it.Cognition)
 	}
 
-	pbest := it.Pop.Best()
 	// TODO: write test to make sure this checks pbest.Best.Val instead of p.Val.
+	pbest := it.Pop.Best()
 	if pbest != nil && pbest.Best.Val < it.best.Val {
 		it.best = pbest.Best
-		// only kill if moving particles found a new best
-		if it.KillDist > 0 && optim.L2Dist(pbest.Point, it.best) < it.KillDist {
-			for i, p := range it.Pop {
-				if p.Id == pbest.Id {
-					it.Pop = append(it.Pop[:i], it.Pop[i+1:]...)
-					break
-				}
-			}
+	}
+
+	// Kill slow particles near global optimum.
+	// This MUST go after the updating of the iterator's best position.
+	for i, p := range it.Pop {
+		if p.Kill(it.best, it.Xtol, it.Vtol) {
+			it.Pop = append(it.Pop[:i], it.Pop[i+1:]...)
 		}
 	}
 
