@@ -52,7 +52,7 @@ type Iterator struct {
 	ev             optim.Evaler
 	Poller         Poller
 	Searcher       Searcher
-	curr           optim.Point
+	Curr           optim.Point
 	DiscreteSearch bool // true to project search points onto poll step size mesh
 	NsuccessGrow   int  // number of successive successful polls before growing mesh
 	nsuccess       int  // (internal) number of successive successful polls
@@ -65,7 +65,7 @@ func NewIterator(e optim.Evaler, start optim.Point, opts ...Option) *Iterator {
 		e = optim.SerialEvaler{}
 	}
 	it := &Iterator{
-		curr:         start,
+		Curr:         start,
 		ev:           e,
 		Poller:       &CompassPoller{Nkeep: start.Len()},
 		Searcher:     NullSearcher{},
@@ -100,7 +100,7 @@ func (it *Iterator) initdb() {
 
 func (it Iterator) xdbsql(op string) string {
 	s := ""
-	for i := range it.curr.Pos() {
+	for i := range it.Curr.Pos() {
 		if op == "?" {
 			s += ",?"
 		} else if op == "define" {
@@ -134,7 +134,7 @@ func (it Iterator) updateDb(nsearch, npoll *int, step float64) {
 	}
 
 	s2 := "INSERT INTO " + TblInfo + " (iter,step,nsearch, npoll,val" + it.xdbsql("x") + ") VALUES (?,?,?,?,?" + it.xdbsql("?") + ");"
-	glob := it.curr
+	glob := it.Curr
 	args := []interface{}{it.count, step, *nsearch, *npoll, glob.Val}
 	args = append(args, pos2iface(glob.Pos())...)
 	_, err = tx.Exec(s2, args...)
@@ -142,8 +142,8 @@ func (it Iterator) updateDb(nsearch, npoll *int, step float64) {
 }
 
 func (it *Iterator) AddPoint(p optim.Point) {
-	if p.Val < it.curr.Val {
-		it.curr = p
+	if p.Val < it.Curr.Val {
+		it.Curr = p
 	}
 }
 
@@ -160,14 +160,14 @@ func (it *Iterator) Iterate(o optim.Objectiver, m mesh.Mesh) (best optim.Point, 
 		m.SetStep(0)
 	}
 
-	success, best, nevalsearch, err = it.Searcher.Search(o, m, it.curr)
+	success, best, nevalsearch, err = it.Searcher.Search(o, m, it.Curr)
 	m.SetStep(prevstep)
 
 	n += nevalsearch
 	if err != nil {
 		return best, n, err
 	} else if success {
-		it.curr = best
+		it.Curr = best
 		return best, n, nil
 	}
 
@@ -176,14 +176,14 @@ func (it *Iterator) Iterate(o optim.Objectiver, m mesh.Mesh) (best optim.Point, 
 	// current mesh grid.  This doesn't need to happen if search succeeds
 	// because search either always operates on the same grid, or always
 	// operates in continuous space.
-	m.SetOrigin(it.curr.Pos()) // TODO: test that this doesn't get set to Zero pos [0 0 0...] on first iteration.
+	m.SetOrigin(it.Curr.Pos()) // TODO: test that this doesn't get set to Zero pos [0 0 0...] on first iteration.
 
-	success, best, nevalpoll, err = it.Poller.Poll(o, it.ev, m, it.curr)
+	success, best, nevalpoll, err = it.Poller.Poll(o, it.ev, m, it.Curr)
 	n += nevalpoll
 	if err != nil {
-		return it.curr, n, err
+		return it.Curr, n, err
 	} else if success {
-		it.curr = best
+		it.Curr = best
 		it.nsuccess++
 		if it.nsuccess == it.NsuccessGrow { // == allows -1 to mean never grow
 			m.SetStep(m.Step() * 2.0)
@@ -203,7 +203,7 @@ func (it *Iterator) Iterate(o optim.Objectiver, m mesh.Mesh) (best optim.Point, 
 		if m.Step() == 0 {
 			err = ZeroStepErr
 		}
-		return it.curr, n, err
+		return it.Curr, n, err
 	}
 }
 
@@ -253,10 +253,15 @@ func (cp *CompassPoller) Poll(obj optim.Objectiver, ev optim.Evaler, m mesh.Mesh
 	}
 	cp.prevstep = m.Step()
 
-	// Add successful directions from last poll.
-	for _, dir := range cp.keepdirecs {
-		pollpoints = append(pollpoints, pointFromDirec(from, dir, m))
+	// Add successful directions from last poll.  We want to add these points
+	// in front of the other points so we can potentially stop earlier if
+	// polling opportunistically.
+	prevgood := make([]optim.Point, len(cp.keepdirecs))
+	for i, dir := range cp.keepdirecs {
+		prevgood[i] = pointFromDirec(from, dir, m)
 	}
+	pollpoints = append(prevgood, pollpoints...)
+	//pollpoints = append(pollpoints, prevgood...)
 	cp.keepdirecs = nil
 
 	cp.points = make([]optim.Point, 0, len(pollpoints))
@@ -360,16 +365,19 @@ func genPollPoints(from optim.Point, span SpanFunc, m mesh.Mesh) []optim.Point {
 // SpanFunc is returns a set of poll directions (maybe positive spanning set?)
 type SpanFunc func(ndim int) [][]int
 
+// Compass2N returns a compass positive basis set of polling directions in a
+// randomized order.
 func Compass2N(ndim int) [][]int {
-	dirs := make([][]int, 0, 2*ndim)
+	dirs := make([][]int, 2*ndim)
+	perms := optim.Rand.Perm(ndim)
 	for i := 0; i < ndim; i++ {
 		d := make([]int, ndim)
 		d[i] = 1
-		dirs = append(dirs, d)
+		dirs[perms[i]] = d
 
 		d = make([]int, ndim)
 		d[i] = -1
-		dirs = append(dirs, d)
+		dirs[ndim+perms[i]] = d
 	}
 	return dirs
 }
