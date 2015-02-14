@@ -428,6 +428,7 @@ func RandomN(n int) SpanFunc {
 			} else {
 				// Intn(-2)+2 is to exclude vector of all zeros and compass directions.
 				nNonzero = optim.Rand.Intn(ndim-2) + 2
+				// TODO: skew this nNonzero distribution to have more lower numbers
 			}
 			perms := optim.Rand.Perm(ndim)
 			for i := 0; i < nNonzero; i++ {
