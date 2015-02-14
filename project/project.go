@@ -1,7 +1,6 @@
 package project
 
 import (
-	"fmt"
 	"math"
 
 	"github.com/gonum/matrix/mat64"
@@ -54,9 +53,10 @@ func Project(m mesh.Mesh, p optim.Point, l, A, u *mat64.Dense) (best optim.Point
 
 		dist := 0.0
 		for i := range v {
-			dist += math.Abs(p.At(i) - v[i])
+			diff := p.At(i) - v[i]
+			dist += diff * diff
 		}
-		return dist
+		return math.Sqrt(dist)
 	}
 
 	// p is already feasible
@@ -80,7 +80,15 @@ func Project(m mesh.Mesh, p optim.Point, l, A, u *mat64.Dense) (best optim.Point
 		}
 	}
 	interior := s.Best()
-	fmt.Println("interior point:", interior)
+
+	// abort if we couldn't find interior point
+	if fn2(interior.Pos()) == math.Inf(1) {
+		return interior, false
+	}
+
+	// dont forget to set interior point val to according to new objective
+	// function.
+	interior.Val = optim.L2Dist(interior, p)
 
 	// solve for an interior point closest to p
 	s = &optim.Solver{
