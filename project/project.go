@@ -75,7 +75,7 @@ func Project(m mesh.Mesh, p optim.Point, l, A, u *mat64.Dense, interior ...optim
 	}
 
 	it := pattern.NewIterator(nil, p, pattern.NsuccessGrow(2))
-	it.Poller = &pattern.CompassPoller{Nkeep: p.Len(), SpanFn: pattern.CompassNp1}
+	it.Poller = &pattern.CompassPoller{Nkeep: 5, SpanFn: pattern.CompassNp1}
 
 	// solve for an interior point
 	s := &optim.Solver{

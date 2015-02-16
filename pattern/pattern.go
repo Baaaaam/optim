@@ -230,7 +230,7 @@ type CompassPoller struct {
 	// results in a point being projected back near the poll origin point.
 	SkipEps    float64
 	SpanFn     SpanFunc
-	keepdirecs [][]int
+	keepdirecs []direc
 	points     []optim.Point
 	prevhash   [sha1.Size]byte
 	prevstep   float64
@@ -238,24 +238,17 @@ type CompassPoller struct {
 
 func (cp *CompassPoller) Points() []optim.Point { return cp.points }
 
-type byval struct {
-	points []optim.Point
-	s      []int
+type direc struct {
+	dir []int
+	val float64
 }
 
-func (b *byval) Less(i, j int) bool   { return b.points[b.s[i]].Val < b.points[b.s[j]].Val }
-func (b *byval) Swap(i, j int)        { b.s[i], b.s[j] = b.s[j], b.s[i] }
-func (b *byval) At(i int) optim.Point { return b.points[b.s[i]] }
+type byval []direc
 
-func (b *byval) Len() int {
-	if b.s == nil {
-		b.s = make([]int, len(b.points))
-		for i := range b.points {
-			b.s[i] = i
-		}
-	}
-	return len(b.points)
-}
+func (b byval) At(i int) []int     { return b[i].dir }
+func (b byval) Less(i, j int) bool { return b[i].val < b[j].val }
+func (b byval) Len() int           { return len(b) }
+func (b byval) Swap(i, j int)      { b[i], b[j] = b[j], b[i] }
 
 func (cp *CompassPoller) Poll(obj optim.Objectiver, ev optim.Evaler, m mesh.Mesh, from optim.Point) (success bool, best optim.Point, neval int, err error) {
 	best = from
@@ -287,11 +280,10 @@ func (cp *CompassPoller) Poll(obj optim.Objectiver, ev optim.Evaler, m mesh.Mesh
 	// polling opportunistically.
 	prevgood := make([]optim.Point, len(cp.keepdirecs))
 	for i, dir := range cp.keepdirecs {
-		prevgood[i] = pointFromDirec(from, dir, m)
+		prevgood[i] = pointFromDirec(from, dir.dir, m)
 	}
 	pollpoints = append(prevgood, pollpoints...)
 	//pollpoints = append(pollpoints, prevgood...)
-	cp.keepdirecs = nil
 
 	cp.points = make([]optim.Point, 0, len(pollpoints))
 	if cp.SkipEps == 0 {
@@ -315,21 +307,24 @@ func (cp *CompassPoller) Poll(obj optim.Objectiver, ev optim.Evaler, m mesh.Mesh
 		return false, best, n, err
 	}
 
+	// this is separate from best to allow all points better than from to be
+	// added to keepdirecs before we update the best point.
+	nextbest := from
+
 	// Sort results and keep the best Nkeep as poll directions.
-	ordered := &byval{points: results}
-	sort.Sort(ordered)
-	if p := ordered.At(0); p.Val < from.Val {
-		best = p
-	}
-	for i := range results {
-		if p := ordered.At(i); p.Val < from.Val {
-			cp.keepdirecs = append(cp.keepdirecs, direcbetween(from, p, m))
-			if len(cp.keepdirecs) == cp.Nkeep {
-				break
-			}
-		} else {
-			break
+	for _, p := range results {
+		if p.Val < best.Val {
+			cp.keepdirecs = append(cp.keepdirecs, direc{direcbetween(from, p, m), p.Val})
 		}
+		if p.Val < nextbest.Val {
+			nextbest = p
+		}
+	}
+	best = nextbest
+
+	sort.Sort(byval(cp.keepdirecs))
+	if len(cp.keepdirecs) > cp.Nkeep {
+		cp.keepdirecs = cp.keepdirecs[:cp.Nkeep]
 	}
 
 	if best.Val < from.Val {
