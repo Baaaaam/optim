@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"sort"
 
 	"github.com/rwcarlsen/optim"
 	"github.com/rwcarlsen/optim/mesh"
@@ -223,7 +224,12 @@ type CompassPoller struct {
 	// Nkeep specifies the number of previous successful poll directions to
 	// reuse on the next poll. The number of reused directions is min(Nkeep,
 	// nsuccessful).
-	Nkeep      int
+	Nkeep int
+	// SkipEps is the distance from the center point within which a poll point
+	// is excluded from evaluation.  This can occur if a mesh projection
+	// results in a point being projected back near the poll origin point.
+	SkipEps    float64
+	SpanFn     SpanFunc
 	keepdirecs [][]int
 	points     []optim.Point
 	prevhash   [sha1.Size]byte
@@ -231,6 +237,25 @@ type CompassPoller struct {
 }
 
 func (cp *CompassPoller) Points() []optim.Point { return cp.points }
+
+type byval struct {
+	points []optim.Point
+	s      []int
+}
+
+func (b *byval) Less(i, j int) bool   { return b.points[b.s[i]].Val < b.points[b.s[j]].Val }
+func (b *byval) Swap(i, j int)        { b.s[i], b.s[j] = b.s[j], b.s[i] }
+func (b *byval) At(i int) optim.Point { return b.points[b.s[i]] }
+
+func (b *byval) Len() int {
+	if b.s == nil {
+		b.s = make([]int, len(b.points))
+		for i := range b.points {
+			b.s[i] = i
+		}
+	}
+	return len(b.points)
+}
 
 func (cp *CompassPoller) Poll(obj optim.Objectiver, ev optim.Evaler, m mesh.Mesh, from optim.Point) (success bool, best optim.Point, neval int, err error) {
 	best = from
@@ -244,7 +269,11 @@ func (cp *CompassPoller) Poll(obj optim.Objectiver, ev optim.Evaler, m mesh.Mesh
 	if h != cp.prevhash || cp.prevstep != m.Step() {
 		// TODO: write test that checks we poll compass dirs again if only mesh
 		// step changed (and not from point)
-		pollpoints = append(pollpoints, genPollPoints(from, Compass2N, m)...)
+		if cp.SpanFn == nil {
+			pollpoints = append(pollpoints, genPollPoints(from, Compass2N, m)...)
+		} else {
+			pollpoints = append(pollpoints, genPollPoints(from, cp.SpanFn, m)...)
+		}
 		pollpoints = append(pollpoints, genPollPoints(from, RandomN(from.Len()), m)...)
 		cp.prevhash = h
 	} else {
@@ -265,18 +294,20 @@ func (cp *CompassPoller) Poll(obj optim.Objectiver, ev optim.Evaler, m mesh.Mesh
 	cp.keepdirecs = nil
 
 	cp.points = make([]optim.Point, 0, len(pollpoints))
-	for _, p := range pollpoints {
-		// It is possible that due to the mesh gridding, the poll point is
-		// outside of constraints or bounds and will be rounded back to the
-		// current point. Check for this and skip the poll point if this is
-		// the case.
-		dist := optim.L2Dist(from, p)
-		eps := 1e-10
-		if dist > eps {
-			cp.points = append(cp.points, p)
+	if cp.SkipEps == 0 {
+		cp.points = pollpoints
+	} else {
+		for _, p := range pollpoints {
+			// It is possible that due to the mesh gridding, the poll point is
+			// outside of constraints or bounds and will be rounded back to the
+			// current point. Check for this and skip the poll point if this is
+			// the case.
+			dist := optim.L2Dist(from, p)
+			if dist > cp.SkipEps {
+				cp.points = append(cp.points, p)
+			}
 		}
 	}
-	cp.points = pollpoints
 
 	objstop := &ObjStopper{Objectiver: obj, Best: from.Val}
 	results, n, err := ev.Eval(objstop, cp.points...)
@@ -284,14 +315,21 @@ func (cp *CompassPoller) Poll(obj optim.Objectiver, ev optim.Evaler, m mesh.Mesh
 		return false, best, n, err
 	}
 
-	for _, p := range results {
-		if p.Val < best.Val {
-			cp.keepdirecs = append(cp.keepdirecs, direcbetween(from, p, m))
-			best = p
-		}
+	// Sort results and keep the best Nkeep as poll directions.
+	ordered := &byval{points: results}
+	sort.Sort(ordered)
+	if p := ordered.At(0); p.Val < from.Val {
+		best = p
 	}
-	if len(cp.keepdirecs) > cp.Nkeep {
-		cp.keepdirecs = cp.keepdirecs[:cp.Nkeep]
+	for i := range results {
+		if p := ordered.At(i); p.Val < from.Val {
+			cp.keepdirecs = append(cp.keepdirecs, direcbetween(from, p, m))
+			if len(cp.keepdirecs) == cp.Nkeep {
+				break
+			}
+		} else {
+			break
+		}
 	}
 
 	if best.Val < from.Val {
@@ -403,12 +441,12 @@ func CompassNp1(ndim int) [][]int {
 
 func pointFromDirec(from optim.Point, direc []int, m mesh.Mesh) optim.Point {
 	pos := make([]float64, from.Len())
+	step := m.Step()
 	for i := range pos {
-		pos[i] = from.At(i) + float64(direc[i])*m.Step()
+		pos[i] = from.At(i) + float64(direc[i])*step
 
 	}
-	p := optim.NewPoint(pos, math.Inf(1))
-	return optim.Nearest(p, m)
+	return optim.NewPoint(m.Nearest(pos), math.Inf(1))
 }
 
 // Random2N returns ndim random polling directions that exclude the

@@ -49,7 +49,7 @@ func TestBenchPSwarmRosen(t *testing.T) {
 	npar := 30
 	maxiter := 10000
 	successfrac := 1.00
-	avgiter := 400.0
+	avgiter := 550.0
 
 	fn := bench.Rosenbrock{ndim}
 	sfn := func() *optim.Solver {
@@ -111,7 +111,7 @@ func TestOverviewPattern(t *testing.T) {
 	maxeval := 50000
 	maxiter := 5000
 	successfrac := 0.30
-	avgiter := 3500.0
+	avgiter := 4000.0
 
 	// ONLY test plain pattern search on convex functions
 	for _, fn := range []bench.Func{bench.Rosenbrock{NDim: 2}} {
@@ -152,7 +152,7 @@ func TestOverviewPSwarm(t *testing.T) {
 	maxeval := 50000
 	maxiter := 5000
 	successfrac := .90
-	avgiter := 200.00
+	avgiter := 250.00
 
 	for _, fn := range bench.Basic {
 		sfn := func() *optim.Solver {

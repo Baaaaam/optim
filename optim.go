@@ -364,7 +364,8 @@ func Nearest(p Point, m mesh.Mesh) Point {
 func L2Dist(p1, p2 Point) float64 {
 	tot := 0.0
 	for i := 0; i < p1.Len(); i++ {
-		tot += math.Pow(p1.At(i)-p2.At(i), 2)
+		diff := p1.At(i) - p2.At(i)
+		tot += diff * diff
 	}
 	return math.Sqrt(tot)
 }

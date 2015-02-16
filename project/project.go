@@ -1,6 +1,7 @@
 package project
 
 import (
+	"fmt"
 	"math"
 
 	"github.com/gonum/matrix/mat64"
@@ -9,7 +10,7 @@ import (
 	"github.com/rwcarlsen/optim/pattern"
 )
 
-func Project(m mesh.Mesh, p optim.Point, l, A, u *mat64.Dense) (best optim.Point, success bool) {
+func Project(m mesh.Mesh, p optim.Point, l, A, u *mat64.Dense, interior ...optim.Point) (best optim.Point, success bool) {
 	stackA, b, _ := optim.StackConstr(l, A, u)
 
 	prevorigin := m.Origin()
@@ -28,12 +29,21 @@ func Project(m mesh.Mesh, p optim.Point, l, A, u *mat64.Dense) (best optim.Point
 		x := mat64.NewDense(len(v), 1, v)
 		ax.Mul(stackA, x)
 
-		m, _ := ax.Dims()
+		m, n := ax.Dims()
 		penalty := 0.0
 		for i := 0; i < m; i++ {
 			if diff := ax.At(i, 0) - b.At(i, 0); diff > 0 {
-				// maybe use "*=" for compounding penalty buildup
-				penalty += diff
+				// normalize each constraint violation to the sum of the
+				// constraint's coefficients - or 1.0 whichever is larger
+				nNonzero := 0.0
+				for j := 0; j < n; j++ {
+					nNonzero += stackA.At(i, j)
+				}
+				nNonzero = math.Abs(nNonzero)
+				if nNonzero == 0 {
+					nNonzero = 1
+				}
+				penalty += diff / nNonzero
 			}
 		}
 		return penalty
@@ -64,38 +74,45 @@ func Project(m mesh.Mesh, p optim.Point, l, A, u *mat64.Dense) (best optim.Point
 		return p, true
 	}
 
+	it := pattern.NewIterator(nil, p, pattern.NsuccessGrow(2))
+	it.Poller = &pattern.CompassPoller{Nkeep: p.Len(), SpanFn: pattern.CompassNp1}
+
 	// solve for an interior point
 	s := &optim.Solver{
-		Iter:    pattern.NewIterator(nil, p),
-		MaxIter: 10000,
-		MaxEval: 10000,
+		Iter:    it,
+		MaxIter: 19000,
+		MaxEval: 19000,
 		Mesh:    m,
 	}
 
-	s.Obj = optim.Func(fn1)
-	for s.Next() {
-		// stop as soon as we find an interior point
-		if s.Best().Val == 0 {
-			break
+	if len(interior) == 0 {
+		s.Obj = optim.Func(fn1)
+		for s.Next() {
+			// stop as soon as we find an interior point
+			if s.Best().Val == 0 {
+				break
+			}
 		}
+		fmt.Println("niter neval", s.Niter(), s.Neval())
+		interior = append(interior, s.Best())
 	}
-	interior := s.Best()
 
 	// abort if we couldn't find interior point
-	if fn2(interior.Pos()) == math.Inf(1) {
-		return interior, false
+	if fn2(interior[0].Pos()) == math.Inf(1) {
+		return interior[0], false
 	}
 
 	// dont forget to set interior point val to according to new objective
 	// function.
-	interior.Val = optim.L2Dist(interior, p)
+	interior[0].Val = optim.L2Dist(interior[0], p)
 
 	// solve for an interior point closest to p
 	s = &optim.Solver{
-		Iter:    pattern.NewIterator(nil, interior),
-		MaxIter: 100000,
-		MaxEval: 100000,
-		Mesh:    m,
+		Iter:         pattern.NewIterator(nil, interior[0]),
+		MaxIter:      3000,
+		MaxEval:      3000,
+		MaxNoImprove: 100,
+		Mesh:         m,
 	}
 
 	s.Obj = optim.Func(fn2)
