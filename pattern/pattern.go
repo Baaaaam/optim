@@ -431,7 +431,11 @@ func CompassNp1(ndim int) [][]int {
 
 		dirs = append(dirs, d)
 	}
-	return append(dirs, final)
+	dirs = append(dirs, final)
+	end := len(dirs) - 1
+	// poll the diagonal direction first
+	dirs[0], dirs[end] = dirs[end], dirs[0]
+	return dirs
 }
 
 func pointFromDirec(from optim.Point, direc []int, m mesh.Mesh) optim.Point {
