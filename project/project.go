@@ -10,40 +10,19 @@ import (
 	"github.com/rwcarlsen/optim/pattern"
 )
 
-func Project(m mesh.Mesh, p optim.Point, l, A, u *mat64.Dense, interior ...optim.Point) (best optim.Point, success bool) {
+func Project(p optim.Point, lb, ub []float64, l, A, u *mat64.Dense, interior ...optim.Point) (best optim.Point, success bool) {
 	stackA, b, _ := optim.StackConstr(l, A, u)
-
-	prevorigin := m.Origin()
-	if prevorigin != nil {
-		defer m.SetOrigin(prevorigin)
-	}
-	m.SetOrigin(p.Pos())
-
-	// This is important because the solver iteration below may modify the
-	// step size.
-	prevstep := m.Step()
-	defer m.SetStep(prevstep)
 
 	fn1 := func(v []float64) float64 {
 		ax := &mat64.Dense{}
 		x := mat64.NewDense(len(v), 1, v)
 		ax.Mul(stackA, x)
 
-		m, n := ax.Dims()
+		m, _ := ax.Dims()
 		penalty := 0.0
 		for i := 0; i < m; i++ {
 			if diff := ax.At(i, 0) - b.At(i, 0); diff > 0 {
-				// normalize each constraint violation to the sum of the
-				// constraint's coefficients - or 1.0 whichever is larger
-				nNonzero := 0.0
-				for j := 0; j < n; j++ {
-					nNonzero += stackA.At(i, j)
-				}
-				nNonzero = math.Abs(nNonzero)
-				if nNonzero == 0 {
-					nNonzero = 1
-				}
-				penalty += diff / nNonzero
+				penalty += diff
 			}
 		}
 		return penalty
@@ -69,33 +48,38 @@ func Project(m mesh.Mesh, p optim.Point, l, A, u *mat64.Dense, interior ...optim
 		return math.Sqrt(dist)
 	}
 
-	// p is already feasible
+	// prepare the mesh
+	var m mesh.Mesh = &mesh.Infinite{}
+	m.SetStep((ub[0] - lb[0]) / 4)
+	m = &mesh.Integer{mesh.NewBounded(m, lb, ub)}
+	m.SetOrigin(p.Pos())
+
+	// check if p is already feasible - no work to do
 	if fn2(m.Nearest(p.Pos())) < math.Inf(1) {
 		return p, true
 	}
 
-	it := pattern.NewIterator(nil, p, pattern.NsuccessGrow(2))
-	it.Poller = &pattern.CompassPoller{Nkeep: 5, SpanFn: pattern.CompassNp1}
-
 	// solve for an interior point
+	it := pattern.NewIterator(nil, p, pattern.NsuccessGrow(1))
+	it.Poller = &pattern.CompassPoller{Nkeep: 5, SpanFn: pattern.CompassNp1}
 	s := &optim.Solver{
 		Iter:    it,
-		MaxIter: 19000,
-		MaxEval: 19000,
+		MaxIter: 20000,
+		MaxEval: 20000,
 		Mesh:    m,
+		Obj:     optim.Func(fn1),
 	}
 
 	if len(interior) == 0 {
-		s.Obj = optim.Func(fn1)
 		for s.Next() {
 			// stop as soon as we find an interior point
 			if s.Best().Val == 0 {
 				break
 			}
 		}
-		fmt.Println("niter neval", s.Niter(), s.Neval())
 		interior = append(interior, s.Best())
 	}
+	fmt.Println("niter neval", s.Niter(), s.Neval())
 
 	// abort if we couldn't find interior point
 	if fn2(interior[0].Pos()) == math.Inf(1) {
@@ -105,18 +89,22 @@ func Project(m mesh.Mesh, p optim.Point, l, A, u *mat64.Dense, interior ...optim
 	// dont forget to set interior point val to according to new objective
 	// function.
 	interior[0].Val = optim.L2Dist(interior[0], p)
+	fmt.Println(interior[0])
 
 	// solve for an interior point closest to p
+	m.SetStep((ub[0] - lb[0]) / 4)
+	it = pattern.NewIterator(nil, interior[0], pattern.NsuccessGrow(1))
+	it.Poller = &pattern.CompassPoller{Nkeep: 5, SpanFn: pattern.CompassNp1}
 	s = &optim.Solver{
-		Iter:         pattern.NewIterator(nil, interior[0]),
-		MaxIter:      3000,
-		MaxEval:      3000,
-		MaxNoImprove: 100,
+		Iter:         it,
+		MaxIter:      300000,
+		MaxEval:      300000,
+		MaxNoImprove: 200,
 		Mesh:         m,
+		Obj:          optim.Func(fn2),
 	}
-
-	s.Obj = optim.Func(fn2)
 	s.Run()
+	fmt.Println("niter neval", s.Niter(), s.Neval())
 	projection := s.Best()
 
 	if fn2(projection.Pos()) < math.Inf(1) {
