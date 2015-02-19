@@ -8,7 +8,6 @@ import (
 
 func TestRandPopConstr(t *testing.T) {
 	n := 100
-	maxiter := 100000
 	lb := []float64{0, 0, 0, 0, 0}
 	ub := []float64{100, 100, 100, 100, 100}
 
@@ -20,7 +19,7 @@ func TestRandPopConstr(t *testing.T) {
 	up := mat64.NewDense(1, 1, []float64{100})
 	A := mat64.NewDense(1, 5, []float64{1, 1, 0, 0, 0})
 
-	points := RandPopConstr(n, maxiter, lb, ub, low, A, up)
+	points := RandPopConstr(n, lb, ub, low, A, up)
 
 	// TODO: build out this test
 	for i, p := range points {

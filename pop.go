@@ -31,7 +31,7 @@ func RandPop(n int, low, up []float64) []Point {
 // RandPopConstr generates a random population of n feasible points satisfying
 // the linear constraints "low <= Ax <= up". lb and ub define lower and upper
 // box bounds for the variables.
-func RandPopConstr(n, maxiter int, lb, ub []float64, low, A, up *mat64.Dense) []Point {
+func RandPopConstr(n int, lb, ub []float64, low, A, up *mat64.Dense) []Point {
 	stackA, b, _ := StackConstrBoxed(lb, ub, low, A, up)
 	_, ndims := A.Dims()
 
