@@ -370,6 +370,35 @@ func L2Dist(p1, p2 Point) float64 {
 	return math.Sqrt(tot)
 }
 
+// StackConstrBoxed converts the equations:
+//
+//     lb <= Ix <= ub
+//     and
+//     low <= Ax <= up
+//
+// into a single equation of the form:
+//
+//     Ax <= b
+func StackConstrBoxed(lb, ub []float64, low, A, up *mat64.Dense) (stackA, b *mat64.Dense, ranges []float64) {
+	lbm := mat64.NewDense(len(lb), 1, lb)
+	ubm := mat64.NewDense(len(ub), 1, ub)
+
+	stacklow := &mat64.Dense{}
+	stacklow.Stack(low, lbm)
+
+	stackup := &mat64.Dense{}
+	stackup.Stack(up, ubm)
+
+	boxA := mat64.NewDense(len(lb), len(lb), nil)
+	for i := 0; i < len(lb); i++ {
+		boxA.Set(i, i, 1)
+	}
+
+	stacked := &mat64.Dense{}
+	stacked.Stack(A, boxA)
+	return StackConstr(stacklow, stacked, stackup)
+}
+
 func StackConstr(low, A, up *mat64.Dense) (stackA, b *mat64.Dense, ranges []float64) {
 	neglow := &mat64.Dense{}
 	neglow.Scale(-1, low)

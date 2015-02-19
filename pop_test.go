@@ -17,7 +17,7 @@ func TestRandPopConstr(t *testing.T) {
 	// (10 / 100) * (10 / 100) * 1/2 chance == 0.005
 	// that a random point will be feasible
 	low := mat64.NewDense(1, 1, []float64{0})
-	up := mat64.NewDense(1, 1, []float64{10})
+	up := mat64.NewDense(1, 1, []float64{100})
 	A := mat64.NewDense(1, 5, []float64{1, 1, 0, 0, 0})
 	prob := .005
 

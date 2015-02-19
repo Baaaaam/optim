@@ -149,7 +149,7 @@ func (m *Bounded) Nearest(p []float64) []float64 {
 }
 
 type Constr struct {
-	A, b *mat64.Dense
+	A, B *mat64.Dense
 	Mesh
 }
 
@@ -160,6 +160,6 @@ type Constr struct {
 func (m *Constr) Nearest(p []float64) []float64 {
 	pdup := make([]float64, len(p))
 	copy(pdup, p)
-	pdup = Nearest(pdup, m.A, m.b)
+	pdup = Nearest(pdup, m.A, m.B)
 	return m.Mesh.Nearest(pdup)
 }
