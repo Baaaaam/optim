@@ -64,19 +64,30 @@ func eye(n int) *mat64.Dense {
 // the equation Ax <= b.
 func Nearest(x0 []float64, A, b *mat64.Dense) []float64 {
 	proj := x0
-	badA := &mat64.Dense{}
-	badb := &mat64.Dense{}
+	var badA *mat64.Dense
+	var badb *mat64.Dense
 	for {
 		Aviol, bviol := mostviolated(proj, A, b)
 
 		if Aviol == nil { // projection is complete
 			break
 		} else {
-			badA.Stack(badA, Aviol)
-			badb.Stack(badb, bviol)
+			if badA == nil {
+				badA, badb = Aviol, bviol
+			} else {
+				tmpA, tmpb := badA, badb
+				badA, badb = &mat64.Dense{}, &mat64.Dense{}
+				badA.Stack(tmpA, Aviol)
+				badb.Stack(tmpb, bviol)
+			}
 		}
 
 		proj = OrthoProj(x0, badA, badb)
+
+		// we have projected to a single point
+		if m, n := badA.Dims(); m == n {
+			break
+		}
 	}
 	return proj
 }
@@ -88,11 +99,11 @@ func mostviolated(x0 []float64, A, b *mat64.Dense) (Aviol, bviol *mat64.Dense) {
 	eps := 1e-10
 
 	ax := &mat64.Dense{}
-	xm := mat64.NewDense(len(x), 1, x0)
+	xm := mat64.NewDense(len(x0), 1, x0)
 	ax.Mul(A, xm)
 
 	m, _ := ax.Dims()
-	worst := 0
+	worst := eps
 	worstRow := -1
 	for i := 0; i < m; i++ {
 		if diff := ax.At(i, 0) - b.At(i, 0); diff > worst {
@@ -104,5 +115,5 @@ func mostviolated(x0 []float64, A, b *mat64.Dense) (Aviol, bviol *mat64.Dense) {
 		return nil, nil
 	}
 
-	return mat64.NewDense(1, len(x), A.Row(nil, worstRow))
+	return mat64.NewDense(1, len(x0), A.Row(nil, worstRow)), mat64.NewDense(1, 1, b.Row(nil, worstRow))
 }
