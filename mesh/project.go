@@ -10,12 +10,12 @@ import "github.com/gonum/matrix/mat64"
 //
 // where x0 is the point being projected and I is the identity matrix.  A is
 // an m by n matrix where m <= n. if m == n, the returned result is the
-// solution to the system A*x0=b
+// solution to the system A*x0=b.
 func OrthoProj(x0 []float64, A, b *mat64.Dense) []float64 {
 	x := mat64.NewDense(len(x0), 1, x0)
 
 	m, n := A.Dims()
-	if m == n {
+	if m >= n {
 		proj, err := mat64.Solve(A, b)
 		if err != nil {
 			panic(err.Error())

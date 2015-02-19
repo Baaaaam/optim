@@ -147,3 +147,19 @@ func (m *Bounded) Nearest(p []float64) []float64 {
 	}
 	return m.Mesh.Nearest(pdup)
 }
+
+type Constr struct {
+	A, b *mat64.Dense
+	Mesh
+}
+
+// Nearest returns the nearest point to p on the grid that approximately
+// satisfies the constraint equation Ax <= b.  The projection onto the
+// feasible region occurs before the snap-to-grid for the underlying mesh step
+// size - so it is possible that the returned point is not actually feasible.
+func (m *Constr) Nearest(p []float64) []float64 {
+	pdup := make([]float64, len(p))
+	copy(pdup, p)
+	pdup = Nearest(pdup, m.A, m.b)
+	return m.Mesh.Nearest(pdup)
+}
