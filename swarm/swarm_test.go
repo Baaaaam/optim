@@ -16,8 +16,8 @@ type fakeRand struct {
 	i     int
 }
 
-func (fr *fakeRand) At(i int) float64 { return fr.rands[i] }
-func (fr *fakeRand) Float64() float64 { fr.i++; return fr.rands[fr.i-1] }
+func (fr *fakeRand) At(i int) float64 { return fr.rands[i%len(fr.rands)] }
+func (fr *fakeRand) Float64() float64 { fr.i++; return fr.rands[(fr.i-1)%len(fr.rands)] }
 func (_ *fakeRand) Intn(n int) int    { return n - 1 }
 func (_ *fakeRand) Perm(n int) []int {
 	p := make([]int, n)
@@ -32,7 +32,7 @@ func TestNewPopulationRand(t *testing.T) {
 	ndim := 7
 	n := 100000
 
-	vmax := (u - l) / 2
+	vmax := (u - l)
 	low := []float64{}
 	up := []float64{}
 	for i := 0; i < ndim; i++ {

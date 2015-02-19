@@ -49,11 +49,15 @@ func TestBenchPSwarmRosen(t *testing.T) {
 	npar := 30
 	maxiter := 10000
 	successfrac := 1.00
-	avgiter := 550.0
+	avgiter := 400.0
 
 	fn := bench.Rosenbrock{ndim}
 	sfn := func() *optim.Solver {
 		it, m := pswarmsolver(fn, nil, npar)
+		it.Poller = &pattern.CompassPoller{
+			SkipEps: 1e-10,
+			SpanFn:  pattern.CompassNp1,
+		}
 		return &optim.Solver{
 			Iter:    it,
 			Obj:     optim.Func(fn.Eval),
@@ -110,13 +114,17 @@ func TestBenchPSwarmRastrigrin(t *testing.T) {
 func TestOverviewPattern(t *testing.T) {
 	maxeval := 50000
 	maxiter := 5000
-	successfrac := 0.30
-	avgiter := 4000.0
+	successfrac := 0.50
+	avgiter := 2500.0
 
 	// ONLY test plain pattern search on convex functions
 	for _, fn := range []bench.Func{bench.Rosenbrock{NDim: 2}} {
 		sfn := func() *optim.Solver {
 			it, m := patternsolver(fn, nil)
+			it.Poller = &pattern.CompassPoller{
+				SkipEps: 1e-10,
+				SpanFn:  pattern.CompassNp1,
+			}
 			return &optim.Solver{
 				Iter:    it,
 				Obj:     optim.Func(fn.Eval),
@@ -169,7 +177,7 @@ func TestOverviewPSwarm(t *testing.T) {
 	}
 }
 
-func patternsolver(fn bench.Func, db *sql.DB) (optim.Iterator, mesh.Mesh) {
+func patternsolver(fn bench.Func, db *sql.DB) (*pattern.Iterator, mesh.Mesh) {
 	low, up := fn.Bounds()
 	max, min := up[0], low[0]
 	m := &mesh.Infinite{StepSize: (max - min) / 10}
@@ -201,7 +209,7 @@ func swarmsolver(fn bench.Func, db *sql.DB, n int, opts ...swarm.Option) optim.I
 	return it
 }
 
-func pswarmsolver(fn bench.Func, db *sql.DB, n int, opts ...pattern.Option) (optim.Iterator, mesh.Mesh) {
+func pswarmsolver(fn bench.Func, db *sql.DB, n int, opts ...pattern.Option) (*pattern.Iterator, mesh.Mesh) {
 	low, up := fn.Bounds()
 	max, min := up[0], low[0]
 	m := &mesh.Infinite{StepSize: (max - min) / 10}
