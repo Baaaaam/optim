@@ -160,6 +160,6 @@ type Constr struct {
 func (m *Constr) Nearest(p []float64) []float64 {
 	pdup := make([]float64, len(p))
 	copy(pdup, p)
-	pdup = Nearest(pdup, m.A, m.B)
+	pdup, _ = Nearest(pdup, m.A, m.B)
 	return m.Mesh.Nearest(pdup)
 }

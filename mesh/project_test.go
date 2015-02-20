@@ -69,7 +69,7 @@ func TestNearest(t *testing.T) {
 		}
 		A := mat64.NewDense(len(test.A), len(test.A[0]), adata)
 		b := mat64.NewDense(len(test.b), 1, test.b)
-		got := Nearest(test.x0, A, b)
+		got, _ := Nearest(test.x0, A, b)
 
 		for i := range got {
 			if diff := math.Abs(got[i] - test.want[i]); diff > eps {
