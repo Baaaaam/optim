@@ -1,7 +1,6 @@
 package optim
 
 import (
-	"fmt"
 	"math"
 
 	"github.com/gonum/matrix/mat64"
@@ -38,7 +37,6 @@ func RandPopConstr(n int, lb, ub []float64, low, A, up *mat64.Dense) []Point {
 
 	points := make([]Point, 0, n)
 	for i := 0; i < n; i++ {
-		fmt.Println("particle", i)
 		pos := make([]float64, ndims)
 		for j := range pos {
 			l, u := lb[j], ub[j]

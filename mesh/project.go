@@ -1,7 +1,6 @@
 package mesh
 
 import (
-	"fmt"
 	"math"
 
 	"github.com/gonum/matrix/mat64"
@@ -73,15 +72,11 @@ func Nearest(x0 []float64, A, b *mat64.Dense) (proj []float64, success bool) {
 	proj = x0
 	var badA *mat64.Dense
 	var badb *mat64.Dense
-	i := 0
 	failcount := 0
 	for {
-		i++
-		fmt.Println("iter ", i)
 		Aviol, bviol := mostviolated(proj, A, b)
 
 		if Aviol == nil { // projection is complete
-			fmt.Println("succeeded:", from, " -->", proj)
 			return proj, true
 		} else {
 			if badA == nil {
@@ -94,20 +89,12 @@ func Nearest(x0 []float64, A, b *mat64.Dense) (proj []float64, success bool) {
 			}
 		}
 
-		fmt.Println("proj: ", proj)
-		fmt.Println("badA: ")
-		m, _ := badA.Dims()
-		for i := 0; i < m; i++ {
-			fmt.Println("  ", i, badA.Row(nil, i), "    :  b =", badb.At(i, 0))
-		}
-
 		newproj, err := OrthoProj(from, badA, badb)
 		if err != nil {
 			failcount++
 			from = proj
 			badA, badb = nil, nil
 			if failcount == 2 {
-				fmt.Println("failed:", from, " -->", proj)
 				return proj, false
 			}
 		} else {
@@ -143,7 +130,6 @@ func mostviolated(x0 []float64, A, b *mat64.Dense) (Aviol, bviol *mat64.Dense) {
 	if worstRow == -1 {
 		return nil, nil
 	}
-	fmt.Println("worstrow=", worstRow, ", farthest=", farthest)
 
 	return mat64.NewDense(1, len(x0), A.Row(nil, worstRow)), mat64.NewDense(1, 1, b.Row(nil, worstRow))
 }
