@@ -27,6 +27,24 @@ func (_ *fakeRand) Perm(n int) []int {
 	return p
 }
 
+func BenchmarkSwarmRosen(b *testing.B) {
+	ndim := 30
+	npar := 30
+	maxiter := 10000
+	fn := bench.Rosenbrock{ndim}
+	for i := 0; i < b.N; i++ {
+		m, mesh := swarmsolver(fn, nil)
+		solv := &optim.Solver{
+			Method:  m,
+			Obj:     optim.Func(fn.Eval),
+			Mesh:    mesh,
+			MaxEval: maxiter * npar,
+			MaxIter: maxiter,
+		}
+		solv.Run()
+	}
+}
+
 func TestNewPopulationRand(t *testing.T) {
 	l, u := -5.0, 5.0
 	ndim := 7
@@ -67,7 +85,6 @@ func TestNewPopulationRand(t *testing.T) {
 	} else {
 		t.Logf("avg vel for 1st dimension: %v < %v (aka .01*vmax)", math.Abs(avg), .01*vmax)
 	}
-
 }
 
 func TestPopulation_Points(t *testing.T) {
@@ -211,11 +228,10 @@ func TestDb(t *testing.T) {
 
 func swarmsolver(fn bench.Func, db *sql.DB) (optim.Method, mesh.Mesh) {
 	low, up := fn.Bounds()
-	m := mesh.NewBounded(&mesh.Infinite{StepSize: 0}, low, up)
-
-	n := 20
-
-	pop := NewPopulationRand(n, low, up)
-	it := New(pop, DB(db))
-	return it, m
+	n := 20 + 1*len(low)
+	return New(
+		NewPopulationRand(n, low, up),
+		VmaxBounds(fn.Bounds()),
+		DB(db),
+	), mesh.NewBounded(&mesh.Infinite{}, low, up)
 }
