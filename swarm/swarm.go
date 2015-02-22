@@ -1,8 +1,24 @@
+// Package swarm provides a particle swarm iterator based on work by Eberhart
+// et al.  This solver has been verified to perform as well as some of their
+// benchmark results in:
+//
+//     Eberhart, Russ C., and Yuhui Shi. "Comparing inertia weights and
+//     constriction factors in particle swarm optimization." Evolutionary
+//     Computation, 2000. Proceedings of the 2000 Congress on. Vol. 1. IEEE, 2000.
+//
+// The problem this solver is benchmarked most carefully against is:
+//
+//    * Rosenbrock 30 dimensions
+//    * -30 <= xi <= 30
+//    * 30 particles
+//    * solved if f(x) <= 100
+//    * average solution in 669 iterations
 package swarm
 
 import (
 	"database/sql"
 	"fmt"
+	"log"
 	"math"
 
 	"github.com/rwcarlsen/optim"
@@ -99,7 +115,8 @@ func (p *Particle) Kill(gbest optim.Point, xtol, vtol float64) bool {
 	diffx := 0.0
 	for i, v := range p.Vel {
 		totv += v * v
-		diffx += math.Pow(p.At(i)-gbest.At(i), 2)
+		diff := p.At(i) - gbest.At(i)
+		diffx += diff * diff
 	}
 	return (totv < vtol*vtol) && (diffx < xtol*xtol)
 }
@@ -216,6 +233,8 @@ func LearnFactors(cognition, social float64) Option {
 	}
 }
 
+func Evaler(e optim.Evaler) Option { return func(it *Iterator) { it.Evaler = e } }
+
 // LinInertia sets particle inertia for velocity updates to varry linearly
 // from the start (high) to end (low) values from 0 to maxiter.  Common values
 // are start = 0.9 and end = 0.4 - for details see:
@@ -259,11 +278,7 @@ type Iterator struct {
 	best  optim.Point
 }
 
-func NewIterator(e optim.Evaler, pop Population, opts ...Option) *Iterator {
-	if e == nil {
-		e = optim.SerialEvaler{}
-	}
-
+func New(pop Population, opts ...Option) *Iterator {
 	vmax := make([]float64, pop[0].Len())
 	for i := range vmax {
 		vmax[i] = math.Inf(1)
@@ -271,7 +286,7 @@ func NewIterator(e optim.Evaler, pop Population, opts ...Option) *Iterator {
 
 	it := &Iterator{
 		Pop:       pop,
-		Evaler:    e,
+		Evaler:    optim.SerialEvaler{},
 		Cognition: DefaultCognition,
 		Social:    DefaultSocial,
 		InertiaFn: func(iter int) float64 { return DefaultInertia },
@@ -285,12 +300,6 @@ func NewIterator(e optim.Evaler, pop Population, opts ...Option) *Iterator {
 
 	it.initdb()
 	return it
-}
-
-func (it *Iterator) AddPoint(p optim.Point) {
-	if p.Val < it.best.Val {
-		it.best = p
-	}
 }
 
 func (it *Iterator) Iterate(obj optim.Objectiver, m mesh.Mesh) (best optim.Point, neval int, err error) {
@@ -336,6 +345,12 @@ func (it *Iterator) Iterate(obj optim.Objectiver, m mesh.Mesh) (best optim.Point
 	return it.best, n, nil
 }
 
+func (it *Iterator) AddPoint(p optim.Point) {
+	if p.Val < it.best.Val {
+		it.best = p
+	}
+}
+
 func (it *Iterator) initdb() {
 	if it.Db == nil {
 		return
@@ -346,27 +361,82 @@ func (it *Iterator) initdb() {
 	s += ");"
 
 	_, err := it.Db.Exec(s)
-	panicif(err)
+	if checkdberr(err) {
+		return
+	}
 
 	s = "CREATE TABLE IF NOT EXISTS " + TblParticlesMeshed + " (particle INTEGER, iter INTEGER, val REAL"
 	s += it.xdbsql("define")
 	s += ");"
 
 	_, err = it.Db.Exec(s)
-	panicif(err)
+	if checkdberr(err) {
+		return
+	}
 
 	s = "CREATE TABLE IF NOT EXISTS " + TblParticlesBest + " (particle INTEGER, iter INTEGER, best REAL"
 	s += it.xdbsql("define")
 	s += ");"
 
 	_, err = it.Db.Exec(s)
-	panicif(err)
+	if checkdberr(err) {
+		return
+	}
 
 	s = "CREATE TABLE IF NOT EXISTS " + TblBest + " (iter INTEGER, val REAL"
 	s += it.xdbsql("define")
 	s += ");"
 	_, err = it.Db.Exec(s)
-	panicif(err)
+	if checkdberr(err) {
+		return
+	}
+}
+
+func (it *Iterator) updateDb(m mesh.Mesh) {
+	if it.Db == nil {
+		return
+	}
+
+	tx, err := it.Db.Begin()
+	if err != nil {
+		panic(err.Error())
+	}
+	defer tx.Commit()
+
+	s0 := "INSERT INTO " + TblParticles + " (particle,iter,val" + it.xdbsql("x") + ") VALUES (?,?,?" + it.xdbsql("?") + ");"
+	s0b := "INSERT INTO " + TblParticlesMeshed + " (particle,iter,best" + it.xdbsql("x") + ") VALUES (?,?,?" + it.xdbsql("?") + ");"
+	s1 := "INSERT INTO " + TblParticlesBest + " (particle,iter,best" + it.xdbsql("x") + ") VALUES (?,?,?" + it.xdbsql("?") + ");"
+	for _, p := range it.Pop {
+		args := []interface{}{p.Id, it.count, p.Val}
+		args = append(args, pos2iface(p.Pos())...)
+		_, err := tx.Exec(s0, args...)
+		if checkdberr(err) {
+			return
+		}
+
+		args = []interface{}{p.Id, it.count, p.Best.Val}
+		args = append(args, pos2iface(p.Best.Pos())...)
+		_, err = tx.Exec(s1, args...)
+		if checkdberr(err) {
+			return
+		}
+
+		args = []interface{}{p.Id, it.count, p.Val}
+		args = append(args, pos2iface(m.Nearest(p.Pos()))...)
+		_, err = tx.Exec(s0b, args...)
+		if checkdberr(err) {
+			return
+		}
+	}
+
+	s2 := "INSERT INTO " + TblBest + " (iter,val" + it.xdbsql("x") + ") VALUES (?,?" + it.xdbsql("?") + ");"
+	glob := it.best
+	args := []interface{}{it.count, glob.Val}
+	args = append(args, pos2iface(glob.Pos())...)
+	_, err = tx.Exec(s2, args...)
+	if checkdberr(err) {
+		return
+	}
 }
 
 func (it *Iterator) xdbsql(op string) string {
@@ -393,50 +463,13 @@ func pos2iface(pos []float64) []interface{} {
 	return iface
 }
 
-func (it *Iterator) updateDb(m mesh.Mesh) {
-	if it.Db == nil {
-		return
-	}
-
-	tx, err := it.Db.Begin()
-	if err != nil {
-		panic(err.Error())
-	}
-	defer tx.Commit()
-
-	s0 := "INSERT INTO " + TblParticles + " (particle,iter,val" + it.xdbsql("x") + ") VALUES (?,?,?" + it.xdbsql("?") + ");"
-	s0b := "INSERT INTO " + TblParticlesMeshed + " (particle,iter,best" + it.xdbsql("x") + ") VALUES (?,?,?" + it.xdbsql("?") + ");"
-	s1 := "INSERT INTO " + TblParticlesBest + " (particle,iter,best" + it.xdbsql("x") + ") VALUES (?,?,?" + it.xdbsql("?") + ");"
-	for _, p := range it.Pop {
-		args := []interface{}{p.Id, it.count, p.Val}
-		args = append(args, pos2iface(p.Pos())...)
-		_, err := tx.Exec(s0, args...)
-		panicif(err)
-
-		args = []interface{}{p.Id, it.count, p.Best.Val}
-		args = append(args, pos2iface(p.Best.Pos())...)
-		_, err = tx.Exec(s1, args...)
-		panicif(err)
-
-		args = []interface{}{p.Id, it.count, p.Val}
-		args = append(args, pos2iface(m.Nearest(p.Pos()))...)
-		_, err = tx.Exec(s0b, args...)
-		panicif(err)
-	}
-
-	s2 := "INSERT INTO " + TblBest + " (iter,val" + it.xdbsql("x") + ") VALUES (?,?" + it.xdbsql("?") + ");"
-	glob := it.best
-	args := []interface{}{it.count, glob.Val}
-	args = append(args, pos2iface(glob.Pos())...)
-	_, err = tx.Exec(s2, args...)
-	panicif(err)
-}
-
 // TODO: remove all uses of this
-func panicif(err error) {
+func checkdberr(err error) bool {
 	if err != nil {
-		panic(err.Error())
+		log.Print("swarm: db write failed -", err)
+		return true
 	}
+	return false
 }
 
 func vmaxfrombounds(low, up []float64) []float64 {

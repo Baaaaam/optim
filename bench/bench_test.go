@@ -205,7 +205,7 @@ func swarmsolver(fn bench.Func, db *sql.DB, n int, opts ...swarm.Option) optim.I
 	)
 
 	pop := swarm.NewPopulationRand(n, low, up)
-	it := swarm.NewIterator(nil, pop, opts...)
+	it := swarm.New(pop, opts...)
 	return it
 }
 
