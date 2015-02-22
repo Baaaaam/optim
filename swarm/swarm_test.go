@@ -216,6 +216,6 @@ func swarmsolver(fn bench.Func, db *sql.DB) (optim.Iterator, mesh.Mesh) {
 	n := 20
 
 	pop := NewPopulationRand(n, low, up)
-	it := NewIterator(nil, pop, DB(db))
+	it := New(pop, DB(db))
 	return it, m
 }

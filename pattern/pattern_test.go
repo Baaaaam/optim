@@ -54,6 +54,6 @@ func patternsolver(fn bench.Func, db *sql.DB) (optim.Iterator, mesh.Mesh) {
 	max, min := up[0], low[0]
 	m := mesh.NewBounded(&mesh.Infinite{StepSize: (max - min) / 10}, low, up)
 	p := optim.NewPoint(m.Origin(), 0)
-	it := NewIterator(nil, p, DB(db))
+	it := New(nil, p, DB(db))
 	return it, m
 }

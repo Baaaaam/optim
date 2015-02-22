@@ -185,7 +185,7 @@ func patternsolver(fn bench.Func, db *sql.DB) (*pattern.Iterator, mesh.Mesh) {
 	p := initialpoint(fn)
 	m.SetOrigin(p.Pos())
 
-	it := pattern.NewIterator(nil, p, pattern.DB(db))
+	it := pattern.New(p, pattern.DB(db))
 	return it, m
 }
 
@@ -224,9 +224,10 @@ func pswarmsolver(fn bench.Func, db *sql.DB, n int, opts ...pattern.Option) (*pa
 	opts = append(opts,
 		pattern.SearchIter(swarm, pattern.Share),
 		pattern.DB(db),
+		pattern.Evaler(ev),
 	)
 
-	it := pattern.NewIterator(ev, p, opts...)
+	it := pattern.New(p, opts...)
 	return it, m
 }
 

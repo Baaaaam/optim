@@ -22,6 +22,8 @@ const (
 
 type Option func(*Iterator)
 
+func Evaler(e optim.Evaler) Option { return func(it *Iterator) { it.ev = e } }
+
 func NsuccessGrow(n int) Option {
 	return func(it *Iterator) {
 		it.NsuccessGrow = n
@@ -61,13 +63,10 @@ type Iterator struct {
 	count          int
 }
 
-func NewIterator(e optim.Evaler, start optim.Point, opts ...Option) *Iterator {
-	if e == nil {
-		e = optim.SerialEvaler{}
-	}
+func New(start optim.Point, opts ...Option) *Iterator {
 	it := &Iterator{
 		Curr:         start,
-		ev:           e,
+		ev:           optim.SerialEvaler{},
 		Poller:       &CompassPoller{Nkeep: start.Len()},
 		Searcher:     NullSearcher{},
 		NsuccessGrow: -1,

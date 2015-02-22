@@ -25,7 +25,7 @@ import (
 	"github.com/rwcarlsen/optim/mesh"
 )
 
-// These params are calculated using a constriction factor originally
+// These parameters are calculated using a constriction factor originally
 // described in:
 //
 //     Clerc and M.  “The swarm and the queen: towards a deterministic and
