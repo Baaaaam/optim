@@ -27,9 +27,19 @@ const (
 )
 
 const (
-	TblParticles     = "swarmparticles"
+	// TblParticles is the name of the sql database table that contains
+	// positions and values for particles for each iteration.
+	TblParticles = "swarmparticles"
+	// TblParticlesMeshed is the name of the sql database table that contains
+	// mesh-projected positions (where objective evaluations actually
+	// occurred)  and values for particles for each iteration.
+	TblParticlesMeshed = "swarmparticlesmesh"
+	// TblParticlesBest is the name of the sql database table that contains
+	// each particle's personal best position at each iteration.
 	TblParticlesBest = "swarmparticlesbest"
-	TblBest          = "swarmbest"
+	// TblBest is the name of the sql database table that contains
+	// the best position for the entire swarm at each iteration.
+	TblBest = "swarmbest"
 )
 
 // Constriction calculates the constriction coefficient for the given c1 and
@@ -210,10 +220,10 @@ func LearnFactors(cognition, social float64) Option {
 // from the start (high) to end (low) values from 0 to maxiter.  Common values
 // are start = 0.9 and end = 0.4 - for details see:
 //
-// Eberhart, R.C.; Yuhui Shi, "Particle swarm optimization: developments,
-// applications and resources," Evolutionary Computation, 2001. Proceedings of
-// the 2001 Congress on , vol.1, no., pp.81,86 vol. 1, 2001 doi:
-// 10.1109/CEC.2001.934374
+//     Eberhart, R.C.; Yuhui Shi, "Particle swarm optimization: developments,
+//     applications and resources," Evolutionary Computation, 2001. Proceedings of
+//     the 2001 Congress on , vol.1, no., pp.81,86 vol. 1, 2001 doi:
+//     10.1109/CEC.2001.934374
 func LinInertia(start, end float64, maxiter int) Option {
 	return func(it *Iterator) {
 		it.InertiaFn = func(iter int) float64 {
@@ -302,7 +312,7 @@ func (it *Iterator) Iterate(obj optim.Objectiver, m mesh.Mesh) (best optim.Point
 	for i := range results {
 		it.Pop[i].Update(results[i])
 	}
-	it.updateDb()
+	it.updateDb(m)
 
 	// move particles and update current best
 	for _, p := range it.Pop {
@@ -336,6 +346,13 @@ func (it *Iterator) initdb() {
 	s += ");"
 
 	_, err := it.Db.Exec(s)
+	panicif(err)
+
+	s = "CREATE TABLE IF NOT EXISTS " + TblParticlesMeshed + " (particle INTEGER, iter INTEGER, val REAL"
+	s += it.xdbsql("define")
+	s += ");"
+
+	_, err = it.Db.Exec(s)
 	panicif(err)
 
 	s = "CREATE TABLE IF NOT EXISTS " + TblParticlesBest + " (particle INTEGER, iter INTEGER, best REAL"
@@ -376,7 +393,7 @@ func pos2iface(pos []float64) []interface{} {
 	return iface
 }
 
-func (it *Iterator) updateDb() {
+func (it *Iterator) updateDb(m mesh.Mesh) {
 	if it.Db == nil {
 		return
 	}
@@ -388,6 +405,7 @@ func (it *Iterator) updateDb() {
 	defer tx.Commit()
 
 	s0 := "INSERT INTO " + TblParticles + " (particle,iter,val" + it.xdbsql("x") + ") VALUES (?,?,?" + it.xdbsql("?") + ");"
+	s0b := "INSERT INTO " + TblParticlesMeshed + " (particle,iter,best" + it.xdbsql("x") + ") VALUES (?,?,?" + it.xdbsql("?") + ");"
 	s1 := "INSERT INTO " + TblParticlesBest + " (particle,iter,best" + it.xdbsql("x") + ") VALUES (?,?,?" + it.xdbsql("?") + ");"
 	for _, p := range it.Pop {
 		args := []interface{}{p.Id, it.count, p.Val}
@@ -398,6 +416,11 @@ func (it *Iterator) updateDb() {
 		args = []interface{}{p.Id, it.count, p.Best.Val}
 		args = append(args, pos2iface(p.Best.Pos())...)
 		_, err = tx.Exec(s1, args...)
+		panicif(err)
+
+		args = []interface{}{p.Id, it.count, p.Val}
+		args = append(args, pos2iface(m.Nearest(p.Pos()))...)
+		_, err = tx.Exec(s0b, args...)
 		panicif(err)
 	}
 
