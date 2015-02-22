@@ -24,7 +24,7 @@ type Rng interface {
 func RandFloat() float64 { return Rand.Float64() }
 
 type Solver struct {
-	Iter         Iterator
+	Method       Method
 	Obj          Objectiver
 	Mesh         mesh.Mesh
 	MaxIter      int
@@ -59,7 +59,7 @@ func (s *Solver) Next() (more bool) {
 
 	var n int
 	var best Point
-	best, n, s.err = s.Iter.Iterate(s.Obj, s.Mesh)
+	best, n, s.err = s.Method.Iterate(s.Obj, s.Mesh)
 	s.neval += n
 	s.niter++
 
@@ -120,7 +120,7 @@ func (p Point) String() string {
 	return fmt.Sprintf("f%v = %v", p.pos, p.Val)
 }
 
-type Iterator interface {
+type Method interface {
 	// Iterate runs a single iteration of a solver and reports the number of
 	// function evaluations n and the best point.
 	Iterate(obj Objectiver, m mesh.Mesh) (best Point, n int, err error)

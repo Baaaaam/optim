@@ -21,13 +21,13 @@ const (
 	TblInfo  = "patterninfo"
 )
 
-type Option func(*Iterator)
+type Option func(*Method)
 
-func Evaler(e optim.Evaler) Option { return func(it *Iterator) { it.ev = e } }
+func Evaler(e optim.Evaler) Option { return func(m *Method) { m.ev = e } }
 
 func NsuccessGrow(n int) Option {
-	return func(it *Iterator) {
-		it.NsuccessGrow = n
+	return func(m *Method) {
+		m.NsuccessGrow = n
 	}
 }
 
@@ -36,40 +36,40 @@ const (
 	NoShare = false
 )
 
-func SearchIter(it optim.Iterator, share bool) Option {
-	return func(iter *Iterator) {
-		iter.Searcher = &WrapSearcher{Iter: it, Share: share}
+func SearchMethod(m optim.Method, share bool) Option {
+	return func(m2 *Method) {
+		m2.Searcher = &WrapSearcher{Method: m, Share: share}
 	}
 }
 
-func DiscreteSearch(it *Iterator) {
-	it.DiscreteSearch = true
+func DiscreteSearch(m *Method) {
+	m.DiscreteSearch = true
 }
 
-// Poll2N sets the iterator to poll in both forward and backward in every
+// Poll2N sets the method to poll in both forward and backward in every
 // compass direction.
-func Poll2N(it *Iterator) { it.Poller.SpanFn = Compass2N }
+func Poll2N(m *Method) { m.Poller.SpanFn = Compass2N }
 
-// PollNp1 sets the iterator to poll in n compass directions with random
+// PollNp1 sets the method to poll in n compass directions with random
 // polarity plus one direction with the opposite of all other directions in
 // every dimension.
-func PollNp1(it *Iterator) { it.Poller.SpanFn = CompassNp1 }
+func PollNp1(m *Method) { m.Poller.SpanFn = CompassNp1 }
 
-// PollRandN sets the iterator to poll in n random directions setting the
+// PollRandN sets the method to poll in n random directions setting the
 // direction for a randomly chosen number of dimensions to +/- step size.
-func PollRandN(n int) Option { return func(it *Iterator) { it.Poller.SpanFn = RandomN(n) } }
+func PollRandN(n int) Option { return func(m *Method) { m.Poller.SpanFn = RandomN(n) } }
 
 func DB(db *sql.DB) Option {
-	return func(it *Iterator) {
-		it.Db = db
+	return func(m *Method) {
+		m.Db = db
 	}
 }
 
-func SkipEps(eps float64) Option { return func(it *Iterator) { it.Poller.SkipEps = eps } }
+func SkipEps(eps float64) Option { return func(m *Method) { m.Poller.SkipEps = eps } }
 
-func Nkeep(n int) Option { return func(it *Iterator) { it.Poller.Nkeep = n } }
+func Nkeep(n int) Option { return func(m *Method) { m.Poller.Nkeep = n } }
 
-type Iterator struct {
+type Method struct {
 	ev             optim.Evaler
 	Poller         *Poller
 	Searcher       Searcher
@@ -81,8 +81,8 @@ type Iterator struct {
 	count          int
 }
 
-func New(start optim.Point, opts ...Option) *Iterator {
-	it := &Iterator{
+func New(start optim.Point, opts ...Option) *Method {
+	m := &Method{
 		Curr:         start,
 		ev:           optim.SerialEvaler{},
 		Poller:       &Poller{Nkeep: start.Len(), SkipEps: 1e-10},
@@ -91,39 +91,39 @@ func New(start optim.Point, opts ...Option) *Iterator {
 	}
 
 	for _, opt := range opts {
-		opt(it)
+		opt(m)
 	}
-	it.initdb()
-	return it
+	m.initdb()
+	return m
 }
 
-func (it *Iterator) AddPoint(p optim.Point) {
-	if p.Val < it.Curr.Val {
-		it.Curr = p
+func (m *Method) AddPoint(p optim.Point) {
+	if p.Val < m.Curr.Val {
+		m.Curr = p
 	}
 }
 
 // Iterate mutates m and so for each iteration, the same, mutated m should be
 // passed in.
-func (it *Iterator) Iterate(o optim.Objectiver, m mesh.Mesh) (best optim.Point, n int, err error) {
+func (m *Method) Iterate(o optim.Objectiver, mesh mesh.Mesh) (best optim.Point, n int, err error) {
 	var nevalsearch, nevalpoll int
 	var success bool
-	defer it.updateDb(&nevalsearch, &nevalpoll, m.Step())
-	it.count++
+	defer m.updateDb(&nevalsearch, &nevalpoll, mesh.Step())
+	m.count++
 
-	prevstep := m.Step()
-	if !it.DiscreteSearch {
-		m.SetStep(0)
+	prevstep := mesh.Step()
+	if !m.DiscreteSearch {
+		mesh.SetStep(0)
 	}
 
-	success, best, nevalsearch, err = it.Searcher.Search(o, m, it.Curr)
-	m.SetStep(prevstep)
+	success, best, nevalsearch, err = m.Searcher.Search(o, mesh, m.Curr)
+	mesh.SetStep(prevstep)
 
 	n += nevalsearch
 	if err != nil {
 		return best, n, err
 	} else if success {
-		it.Curr = best
+		m.Curr = best
 		return best, n, nil
 	}
 
@@ -132,63 +132,63 @@ func (it *Iterator) Iterate(o optim.Objectiver, m mesh.Mesh) (best optim.Point, 
 	// current mesh grid.  This doesn't need to happen if search succeeds
 	// because search either always operates on the same grid, or always
 	// operates in continuous space.
-	m.SetOrigin(it.Curr.Pos()) // TODO: test that this doesn't get set to Zero pos [0 0 0...] on first iteration.
+	mesh.SetOrigin(m.Curr.Pos()) // TODO: test that this doesn't get set to Zero pos [0 0 0...] on first iteration.
 
-	success, best, nevalpoll, err = it.Poller.Poll(o, it.ev, m, it.Curr)
+	success, best, nevalpoll, err = m.Poller.Poll(o, m.ev, mesh, m.Curr)
 	n += nevalpoll
 	if err != nil {
-		return it.Curr, n, err
+		return m.Curr, n, err
 	} else if success {
-		it.Curr = best
-		it.nsuccess++
-		if it.nsuccess == it.NsuccessGrow { // == allows -1 to mean never grow
-			m.SetStep(m.Step() * 2.0)
-			it.nsuccess = 0 // reset after resize
+		m.Curr = best
+		m.nsuccess++
+		if m.nsuccess == m.NsuccessGrow { // == allows -1 to mean never grow
+			mesh.SetStep(mesh.Step() * 2.0)
+			m.nsuccess = 0 // reset after resize
 		}
 
 		// Important to recenter mesh on new best point.  More particularly,
 		// the mesh may have been resized and the new best may not lie on the
 		// previous mesh grid.
-		m.SetOrigin(best.Pos())
+		mesh.SetOrigin(best.Pos())
 
 		return best, n, nil
 	} else {
-		it.nsuccess = 0
+		m.nsuccess = 0
 		var err error
-		m.SetStep(m.Step() * 0.5)
-		if m.Step() == 0 {
+		mesh.SetStep(mesh.Step() * 0.5)
+		if mesh.Step() == 0 {
 			err = ZeroStepErr
 		}
-		return it.Curr, n, err
+		return m.Curr, n, err
 	}
 }
 
-func (it *Iterator) initdb() {
-	if it.Db == nil {
+func (m *Method) initdb() {
+	if m.Db == nil {
 		return
 	}
 
 	s := "CREATE TABLE IF NOT EXISTS " + TblPolls + " (iter INTEGER,val REAL"
-	s += it.xdbsql("define")
+	s += m.xdbsql("define")
 	s += ");"
 
-	_, err := it.Db.Exec(s)
+	_, err := m.Db.Exec(s)
 	if checkdberr(err) {
 		return
 	}
 
 	s = "CREATE TABLE IF NOT EXISTS " + TblInfo + " (iter INTEGER,step INTEGER,nsearch INTEGER,npoll INTEGER,val REAL"
-	s += it.xdbsql("define")
+	s += m.xdbsql("define")
 	s += ");"
-	_, err = it.Db.Exec(s)
+	_, err = m.Db.Exec(s)
 	if checkdberr(err) {
 		return
 	}
 }
 
-func (it Iterator) xdbsql(op string) string {
+func (m Method) xdbsql(op string) string {
 	s := ""
-	for i := range it.Curr.Pos() {
+	for i := range m.Curr.Pos() {
 		if op == "?" {
 			s += ",?"
 		} else if op == "define" {
@@ -202,20 +202,20 @@ func (it Iterator) xdbsql(op string) string {
 	return s
 }
 
-func (it Iterator) updateDb(nsearch, npoll *int, step float64) {
-	if it.Db == nil {
+func (m Method) updateDb(nsearch, npoll *int, step float64) {
+	if m.Db == nil {
 		return
 	}
 
-	tx, err := it.Db.Begin()
+	tx, err := m.Db.Begin()
 	if err != nil {
 		panic(err.Error())
 	}
 	defer tx.Commit()
 
-	s1 := "INSERT INTO " + TblPolls + " (iter,val" + it.xdbsql("x") + ") VALUES (?,?" + it.xdbsql("?") + ");"
-	for _, p := range it.Poller.Points() {
-		args := []interface{}{it.count, p.Val}
+	s1 := "INSERT INTO " + TblPolls + " (iter,val" + m.xdbsql("x") + ") VALUES (?,?" + m.xdbsql("?") + ");"
+	for _, p := range m.Poller.Points() {
+		args := []interface{}{m.count, p.Val}
 		args = append(args, pos2iface(p.Pos())...)
 		_, err := tx.Exec(s1, args...)
 		if checkdberr(err) {
@@ -223,9 +223,9 @@ func (it Iterator) updateDb(nsearch, npoll *int, step float64) {
 		}
 	}
 
-	s2 := "INSERT INTO " + TblInfo + " (iter,step,nsearch, npoll,val" + it.xdbsql("x") + ") VALUES (?,?,?,?,?" + it.xdbsql("?") + ");"
-	glob := it.Curr
-	args := []interface{}{it.count, step, *nsearch, *npoll, glob.Val}
+	s2 := "INSERT INTO " + TblInfo + " (iter,step,nsearch, npoll,val" + m.xdbsql("x") + ") VALUES (?,?,?,?,?" + m.xdbsql("?") + ");"
+	glob := m.Curr
+	args := []interface{}{m.count, step, *nsearch, *npoll, glob.Val}
 	args = append(args, pos2iface(glob.Pos())...)
 	_, err = tx.Exec(s2, args...)
 	if checkdberr(err) {
@@ -364,17 +364,17 @@ func (_ NullSearcher) Search(o optim.Objectiver, m mesh.Mesh, curr optim.Point) 
 }
 
 type WrapSearcher struct {
-	Iter optim.Iterator
+	Method optim.Method
 	// Share specifies whether to add the current best point to the
-	// searcher's underlying Iterator before performing the search.
+	// searcher's underlying method before performing the search.
 	Share bool
 }
 
 func (s *WrapSearcher) Search(o optim.Objectiver, m mesh.Mesh, curr optim.Point) (success bool, best optim.Point, n int, err error) {
 	if s.Share {
-		s.Iter.AddPoint(curr)
+		s.Method.AddPoint(curr)
 	}
-	best, n, err = s.Iter.Iterate(o, m)
+	best, n, err = s.Method.Iterate(o, m)
 	if err != nil {
 		return false, optim.Point{}, n, err
 	}

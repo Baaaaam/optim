@@ -22,7 +22,7 @@ func TestDb(t *testing.T) {
 	it, m := patternsolver(fn, db)
 
 	solv := &optim.Solver{
-		Iter:    it,
+		Method:  it,
 		Obj:     optim.Func(fn.Eval),
 		Mesh:    m,
 		MaxIter: 100,
@@ -49,7 +49,7 @@ func TestDb(t *testing.T) {
 	}
 }
 
-func patternsolver(fn bench.Func, db *sql.DB) (optim.Iterator, mesh.Mesh) {
+func patternsolver(fn bench.Func, db *sql.DB) (optim.Method, mesh.Mesh) {
 	low, up := fn.Bounds()
 	max, min := up[0], low[0]
 	m := mesh.NewBounded(&mesh.Infinite{StepSize: (max - min) / 10}, low, up)

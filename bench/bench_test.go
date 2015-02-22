@@ -35,7 +35,7 @@ func TestBenchSwarmRosen(t *testing.T) {
 	fn := bench.Rosenbrock{ndim}
 	sfn := func() *optim.Solver {
 		return &optim.Solver{
-			Iter:    swarmsolver(fn, nil, npar),
+			Method:  swarmsolver(fn, nil, npar),
 			Obj:     optim.Func(fn.Eval),
 			MaxEval: maxiter * npar,
 			MaxIter: maxiter,
@@ -59,7 +59,7 @@ func TestBenchPSwarmRosen(t *testing.T) {
 			SpanFn:  pattern.CompassNp1,
 		}
 		return &optim.Solver{
-			Iter:    it,
+			Method:  it,
 			Obj:     optim.Func(fn.Eval),
 			Mesh:    m,
 			MaxEval: maxiter * npar,
@@ -80,7 +80,7 @@ func TestBenchPSwarmGriewank(t *testing.T) {
 	sfn := func() *optim.Solver {
 		it, m := pswarmsolver(fn, nil, npar)
 		return &optim.Solver{
-			Iter:    it,
+			Method:  it,
 			Obj:     optim.Func(fn.Eval),
 			Mesh:    m,
 			MaxEval: maxiter * npar,
@@ -101,7 +101,7 @@ func TestBenchPSwarmRastrigrin(t *testing.T) {
 	sfn := func() *optim.Solver {
 		it, m := pswarmsolver(fn, nil, npar)
 		return &optim.Solver{
-			Iter:    it,
+			Method:  it,
 			Obj:     optim.Func(fn.Eval),
 			Mesh:    m,
 			MaxEval: maxiter * npar,
@@ -126,7 +126,7 @@ func TestOverviewPattern(t *testing.T) {
 				SpanFn:  pattern.CompassNp1,
 			}
 			return &optim.Solver{
-				Iter:    it,
+				Method:  it,
 				Obj:     optim.Func(fn.Eval),
 				Mesh:    m,
 				MaxIter: maxiter,
@@ -146,7 +146,7 @@ func TestOverviewSwarm(t *testing.T) {
 	for _, fn := range bench.Basic {
 		sfn := func() *optim.Solver {
 			return &optim.Solver{
-				Iter:    swarmsolver(fn, nil, -1),
+				Method:  swarmsolver(fn, nil, -1),
 				Obj:     optim.Func(fn.Eval),
 				MaxEval: maxeval,
 				MaxIter: maxiter,
@@ -166,7 +166,7 @@ func TestOverviewPSwarm(t *testing.T) {
 		sfn := func() *optim.Solver {
 			it, m := pswarmsolver(fn, nil, -1)
 			return &optim.Solver{
-				Iter:    it,
+				Method:  it,
 				Obj:     optim.Func(fn.Eval),
 				Mesh:    m,
 				MaxEval: maxeval,
@@ -177,7 +177,7 @@ func TestOverviewPSwarm(t *testing.T) {
 	}
 }
 
-func patternsolver(fn bench.Func, db *sql.DB) (*pattern.Iterator, mesh.Mesh) {
+func patternsolver(fn bench.Func, db *sql.DB) (*pattern.Method, mesh.Mesh) {
 	low, up := fn.Bounds()
 	max, min := up[0], low[0]
 	m := &mesh.Infinite{StepSize: (max - min) / 10}
@@ -187,7 +187,7 @@ func patternsolver(fn bench.Func, db *sql.DB) (*pattern.Iterator, mesh.Mesh) {
 	return it, m
 }
 
-func swarmsolver(fn bench.Func, db *sql.DB, n int) optim.Iterator {
+func swarmsolver(fn bench.Func, db *sql.DB, n int) optim.Method {
 	low, up := fn.Bounds()
 
 	if n < 0 {
@@ -205,7 +205,7 @@ func swarmsolver(fn bench.Func, db *sql.DB, n int) optim.Iterator {
 	return it
 }
 
-func pswarmsolver(fn bench.Func, db *sql.DB, n int) (*pattern.Iterator, mesh.Mesh) {
+func pswarmsolver(fn bench.Func, db *sql.DB, n int) (*pattern.Method, mesh.Mesh) {
 	low, up := fn.Bounds()
 	max, min := up[0], low[0]
 	m := &mesh.Infinite{StepSize: (max - min) / 10}
@@ -213,7 +213,7 @@ func pswarmsolver(fn bench.Func, db *sql.DB, n int) (*pattern.Iterator, mesh.Mes
 	m.SetOrigin(p.Pos())
 
 	it := pattern.New(p,
-		pattern.SearchIter(swarmsolver(fn, db, n), pattern.Share),
+		pattern.SearchMethod(swarmsolver(fn, db, n), pattern.Share),
 		pattern.DB(db),
 	)
 	return it, m
