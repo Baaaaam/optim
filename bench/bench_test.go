@@ -54,7 +54,7 @@ func TestBenchPSwarmRosen(t *testing.T) {
 	fn := bench.Rosenbrock{ndim}
 	sfn := func() *optim.Solver {
 		it, m := pswarmsolver(fn, nil, npar)
-		it.Poller = &pattern.CompassPoller{
+		it.Poller = &pattern.Poller{
 			SkipEps: 1e-10,
 			SpanFn:  pattern.CompassNp1,
 		}
@@ -121,7 +121,7 @@ func TestOverviewPattern(t *testing.T) {
 	for _, fn := range []bench.Func{bench.Rosenbrock{NDim: 2}} {
 		sfn := func() *optim.Solver {
 			it, m := patternsolver(fn, nil)
-			it.Poller = &pattern.CompassPoller{
+			it.Poller = &pattern.Poller{
 				SkipEps: 1e-10,
 				SpanFn:  pattern.CompassNp1,
 			}
@@ -181,15 +181,13 @@ func patternsolver(fn bench.Func, db *sql.DB) (*pattern.Iterator, mesh.Mesh) {
 	low, up := fn.Bounds()
 	max, min := up[0], low[0]
 	m := &mesh.Infinite{StepSize: (max - min) / 10}
-
 	p := initialpoint(fn)
 	m.SetOrigin(p.Pos())
-
 	it := pattern.New(p, pattern.DB(db))
 	return it, m
 }
 
-func swarmsolver(fn bench.Func, db *sql.DB, n int, opts ...swarm.Option) optim.Iterator {
+func swarmsolver(fn bench.Func, db *sql.DB, n int) optim.Iterator {
 	low, up := fn.Bounds()
 
 	if n < 0 {
@@ -199,35 +197,25 @@ func swarmsolver(fn bench.Func, db *sql.DB, n int, opts ...swarm.Option) optim.I
 		}
 	}
 
-	opts = append(opts,
+	it := swarm.New(
+		swarm.NewPopulationRand(n, low, up),
 		swarm.VmaxBounds(fn.Bounds()),
 		swarm.DB(db),
 	)
-
-	pop := swarm.NewPopulationRand(n, low, up)
-	it := swarm.New(pop, opts...)
 	return it
 }
 
-func pswarmsolver(fn bench.Func, db *sql.DB, n int, opts ...pattern.Option) (*pattern.Iterator, mesh.Mesh) {
+func pswarmsolver(fn bench.Func, db *sql.DB, n int) (*pattern.Iterator, mesh.Mesh) {
 	low, up := fn.Bounds()
 	max, min := up[0], low[0]
 	m := &mesh.Infinite{StepSize: (max - min) / 10}
-
-	ev := optim.SerialEvaler{}
-
-	swarm := swarmsolver(fn, db, n)
-
 	p := initialpoint(fn)
 	m.SetOrigin(p.Pos())
 
-	opts = append(opts,
-		pattern.SearchIter(swarm, pattern.Share),
+	it := pattern.New(p,
+		pattern.SearchIter(swarmsolver(fn, db, n), pattern.Share),
 		pattern.DB(db),
-		pattern.Evaler(ev),
 	)
-
-	it := pattern.New(p, opts...)
 	return it, m
 }
 
