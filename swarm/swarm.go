@@ -404,7 +404,7 @@ func (m *Method) updateDb(mesh mesh.Mesh) {
 	defer tx.Commit()
 
 	s0 := "INSERT INTO " + TblParticles + " (particle,iter,val" + m.xdbsql("x") + ") VALUES (?,?,?" + m.xdbsql("?") + ");"
-	s0b := "INSERT INTO " + TblParticlesMeshed + " (particle,iter,best" + m.xdbsql("x") + ") VALUES (?,?,?" + m.xdbsql("?") + ");"
+	s0b := "INSERT INTO " + TblParticlesMeshed + " (particle,iter,val" + m.xdbsql("x") + ") VALUES (?,?,?" + m.xdbsql("?") + ");"
 	s1 := "INSERT INTO " + TblParticlesBest + " (particle,iter,best" + m.xdbsql("x") + ") VALUES (?,?,?" + m.xdbsql("?") + ");"
 	for _, p := range m.Pop {
 		args := []interface{}{p.Id, m.count, p.Val}

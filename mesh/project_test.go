@@ -134,7 +134,10 @@ func TestOrthoProj(t *testing.T) {
 		}
 		A := mat64.NewDense(len(test.A), len(test.A[0]), adata)
 		b := mat64.NewDense(len(test.b), 1, test.b)
-		got := OrthoProj(test.x0, A, b)
+		got, err := OrthoProj(test.x0, A, b)
+		if err != nil {
+			t.Fatal(err)
+		}
 
 		for i := range got {
 			if diff := math.Abs(got[i] - test.want[i]); diff > eps {
