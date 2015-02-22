@@ -183,18 +183,18 @@ func (pop Population) Best() *Particle {
 	return best
 }
 
-type Option func(*Iterator)
+type Option func(*Method)
 
 func Vmax(vmaxes []float64) Option {
-	return func(it *Iterator) {
-		it.Vmax = vmaxes
+	return func(m *Method) {
+		m.Vmax = vmaxes
 	}
 }
 
 func VmaxAll(vmax float64) Option {
-	return func(it *Iterator) {
-		for i := range it.Vmax {
-			it.Vmax[i] = vmax
+	return func(m *Method) {
+		for i := range m.Vmax {
+			m.Vmax[i] = vmax
 		}
 	}
 }
@@ -208,32 +208,32 @@ func VmaxAll(vmax float64) Option {
 //     the 2001 Congress on , vol.1, no., pp.81,86 vol. 1, 2001 doi:
 //     10.1109/CEC.2001.934374
 func VmaxBounds(low, up []float64) Option {
-	return func(it *Iterator) {
-		it.Vmax = vmaxfrombounds(low, up)
+	return func(m *Method) {
+		m.Vmax = vmaxfrombounds(low, up)
 	}
 }
 
 func DB(db *sql.DB) Option {
-	return func(it *Iterator) {
-		it.Db = db
+	return func(m *Method) {
+		m.Db = db
 	}
 }
 
 func KillTol(xtol, vtol float64) Option {
-	return func(it *Iterator) {
-		it.Xtol = xtol
-		it.Vtol = vtol
+	return func(m *Method) {
+		m.Xtol = xtol
+		m.Vtol = vtol
 	}
 }
 
 func LearnFactors(cognition, social float64) Option {
-	return func(it *Iterator) {
-		it.Cognition = cognition
-		it.Social = social
+	return func(m *Method) {
+		m.Cognition = cognition
+		m.Social = social
 	}
 }
 
-func Evaler(e optim.Evaler) Option { return func(it *Iterator) { it.Evaler = e } }
+func Evaler(e optim.Evaler) Option { return func(m *Method) { m.Evaler = e } }
 
 // LinInertia sets particle inertia for velocity updates to varry linearly
 // from the start (high) to end (low) values from 0 to maxiter.  Common values
@@ -244,20 +244,20 @@ func Evaler(e optim.Evaler) Option { return func(it *Iterator) { it.Evaler = e }
 //     the 2001 Congress on , vol.1, no., pp.81,86 vol. 1, 2001 doi:
 //     10.1109/CEC.2001.934374
 func LinInertia(start, end float64, maxiter int) Option {
-	return func(it *Iterator) {
-		it.InertiaFn = func(iter int) float64 {
+	return func(m *Method) {
+		m.InertiaFn = func(iter int) float64 {
 			return start - (start-end)*float64(iter)/float64(maxiter)
 		}
 	}
 }
 
 func FixedInertia(v float64) Option {
-	return func(it *Iterator) {
-		it.InertiaFn = func(iter int) float64 { return v }
+	return func(m *Method) {
+		m.InertiaFn = func(iter int) float64 { return v }
 	}
 }
 
-type Iterator struct {
+type Method struct {
 	// Xtol is the distance from the global best under which particles are
 	// considered to removal.  This must occur simultaneously with the Vtol
 	// condition.
@@ -278,13 +278,13 @@ type Iterator struct {
 	best  optim.Point
 }
 
-func New(pop Population, opts ...Option) *Iterator {
+func New(pop Population, opts ...Option) *Method {
 	vmax := make([]float64, pop[0].Len())
 	for i := range vmax {
 		vmax[i] = math.Inf(1)
 	}
 
-	it := &Iterator{
+	m := &Method{
 		Pop:       pop,
 		Evaler:    optim.SerialEvaler{},
 		Cognition: DefaultCognition,
@@ -295,143 +295,143 @@ func New(pop Population, opts ...Option) *Iterator {
 	}
 
 	for _, opt := range opts {
-		opt(it)
+		opt(m)
 	}
 
-	it.initdb()
-	return it
+	m.initdb()
+	return m
 }
 
-func (it *Iterator) Iterate(obj optim.Objectiver, m mesh.Mesh) (best optim.Point, neval int, err error) {
-	it.count++
+func (m *Method) Iterate(obj optim.Objectiver, mesh mesh.Mesh) (best optim.Point, neval int, err error) {
+	m.count++
 
 	// project positions onto mesh
-	points := it.Pop.Points()
-	if m != nil {
+	points := m.Pop.Points()
+	if mesh != nil {
 		for i, p := range points {
-			points[i] = optim.Nearest(p, m)
+			points[i] = optim.Nearest(p, mesh)
 		}
 	}
 
 	// evaluate current positions
-	results, n, err := it.Evaler.Eval(obj, points...)
+	results, n, err := m.Evaler.Eval(obj, points...)
 	if err != nil {
 		return optim.Point{Val: math.Inf(1)}, n, err
 	}
 	for i := range results {
-		it.Pop[i].Update(results[i])
+		m.Pop[i].Update(results[i])
 	}
-	it.updateDb(m)
+	m.updateDb(mesh)
 
 	// move particles and update current best
-	for _, p := range it.Pop {
-		p.Move(it.best, it.Vmax, it.InertiaFn(it.count), it.Social, it.Cognition)
+	for _, p := range m.Pop {
+		p.Move(m.best, m.Vmax, m.InertiaFn(m.count), m.Social, m.Cognition)
 	}
 
 	// TODO: write test to make sure this checks pbest.Best.Val instead of p.Val.
-	pbest := it.Pop.Best()
-	if pbest != nil && pbest.Best.Val < it.best.Val {
-		it.best = pbest.Best
+	pbest := m.Pop.Best()
+	if pbest != nil && pbest.Best.Val < m.best.Val {
+		m.best = pbest.Best
 	}
 
 	// Kill slow particles near global optimum.
 	// This MUST go after the updating of the iterator's best position.
-	for i, p := range it.Pop {
-		if p.Kill(it.best, it.Xtol, it.Vtol) {
-			it.Pop = append(it.Pop[:i], it.Pop[i+1:]...)
+	for i, p := range m.Pop {
+		if p.Kill(m.best, m.Xtol, m.Vtol) {
+			m.Pop = append(m.Pop[:i], m.Pop[i+1:]...)
 		}
 	}
 
-	return it.best, n, nil
+	return m.best, n, nil
 }
 
-func (it *Iterator) AddPoint(p optim.Point) {
-	if p.Val < it.best.Val {
-		it.best = p
+func (m *Method) AddPoint(p optim.Point) {
+	if p.Val < m.best.Val {
+		m.best = p
 	}
 }
 
-func (it *Iterator) initdb() {
-	if it.Db == nil {
+func (m *Method) initdb() {
+	if m.Db == nil {
 		return
 	}
 
 	s := "CREATE TABLE IF NOT EXISTS " + TblParticles + " (particle INTEGER, iter INTEGER, val REAL"
-	s += it.xdbsql("define")
+	s += m.xdbsql("define")
 	s += ");"
 
-	_, err := it.Db.Exec(s)
+	_, err := m.Db.Exec(s)
 	if checkdberr(err) {
 		return
 	}
 
 	s = "CREATE TABLE IF NOT EXISTS " + TblParticlesMeshed + " (particle INTEGER, iter INTEGER, val REAL"
-	s += it.xdbsql("define")
+	s += m.xdbsql("define")
 	s += ");"
 
-	_, err = it.Db.Exec(s)
+	_, err = m.Db.Exec(s)
 	if checkdberr(err) {
 		return
 	}
 
 	s = "CREATE TABLE IF NOT EXISTS " + TblParticlesBest + " (particle INTEGER, iter INTEGER, best REAL"
-	s += it.xdbsql("define")
+	s += m.xdbsql("define")
 	s += ");"
 
-	_, err = it.Db.Exec(s)
+	_, err = m.Db.Exec(s)
 	if checkdberr(err) {
 		return
 	}
 
 	s = "CREATE TABLE IF NOT EXISTS " + TblBest + " (iter INTEGER, val REAL"
-	s += it.xdbsql("define")
+	s += m.xdbsql("define")
 	s += ");"
-	_, err = it.Db.Exec(s)
+	_, err = m.Db.Exec(s)
 	if checkdberr(err) {
 		return
 	}
 }
 
-func (it *Iterator) updateDb(m mesh.Mesh) {
-	if it.Db == nil {
+func (m *Method) updateDb(mesh mesh.Mesh) {
+	if m.Db == nil {
 		return
 	}
 
-	tx, err := it.Db.Begin()
+	tx, err := m.Db.Begin()
 	if err != nil {
 		panic(err.Error())
 	}
 	defer tx.Commit()
 
-	s0 := "INSERT INTO " + TblParticles + " (particle,iter,val" + it.xdbsql("x") + ") VALUES (?,?,?" + it.xdbsql("?") + ");"
-	s0b := "INSERT INTO " + TblParticlesMeshed + " (particle,iter,best" + it.xdbsql("x") + ") VALUES (?,?,?" + it.xdbsql("?") + ");"
-	s1 := "INSERT INTO " + TblParticlesBest + " (particle,iter,best" + it.xdbsql("x") + ") VALUES (?,?,?" + it.xdbsql("?") + ");"
-	for _, p := range it.Pop {
-		args := []interface{}{p.Id, it.count, p.Val}
+	s0 := "INSERT INTO " + TblParticles + " (particle,iter,val" + m.xdbsql("x") + ") VALUES (?,?,?" + m.xdbsql("?") + ");"
+	s0b := "INSERT INTO " + TblParticlesMeshed + " (particle,iter,best" + m.xdbsql("x") + ") VALUES (?,?,?" + m.xdbsql("?") + ");"
+	s1 := "INSERT INTO " + TblParticlesBest + " (particle,iter,best" + m.xdbsql("x") + ") VALUES (?,?,?" + m.xdbsql("?") + ");"
+	for _, p := range m.Pop {
+		args := []interface{}{p.Id, m.count, p.Val}
 		args = append(args, pos2iface(p.Pos())...)
 		_, err := tx.Exec(s0, args...)
 		if checkdberr(err) {
 			return
 		}
 
-		args = []interface{}{p.Id, it.count, p.Best.Val}
+		args = []interface{}{p.Id, m.count, p.Best.Val}
 		args = append(args, pos2iface(p.Best.Pos())...)
 		_, err = tx.Exec(s1, args...)
 		if checkdberr(err) {
 			return
 		}
 
-		args = []interface{}{p.Id, it.count, p.Val}
-		args = append(args, pos2iface(m.Nearest(p.Pos()))...)
+		args = []interface{}{p.Id, m.count, p.Val}
+		args = append(args, pos2iface(mesh.Nearest(p.Pos()))...)
 		_, err = tx.Exec(s0b, args...)
 		if checkdberr(err) {
 			return
 		}
 	}
 
-	s2 := "INSERT INTO " + TblBest + " (iter,val" + it.xdbsql("x") + ") VALUES (?,?" + it.xdbsql("?") + ");"
-	glob := it.best
-	args := []interface{}{it.count, glob.Val}
+	s2 := "INSERT INTO " + TblBest + " (iter,val" + m.xdbsql("x") + ") VALUES (?,?" + m.xdbsql("?") + ");"
+	glob := m.best
+	args := []interface{}{m.count, glob.Val}
 	args = append(args, pos2iface(glob.Pos())...)
 	_, err = tx.Exec(s2, args...)
 	if checkdberr(err) {
@@ -439,9 +439,9 @@ func (it *Iterator) updateDb(m mesh.Mesh) {
 	}
 }
 
-func (it *Iterator) xdbsql(op string) string {
+func (m *Method) xdbsql(op string) string {
 	s := ""
-	for i := range it.Pop[0].Pos() {
+	for i := range m.Pop[0].Pos() {
 		if op == "?" {
 			s += ",?"
 		} else if op == "define" {
