@@ -1,4 +1,4 @@
-package mesh
+package optim
 
 import (
 	"math"
@@ -14,7 +14,7 @@ type projtest struct {
 	want []float64
 }
 
-func TestNearest(t *testing.T) {
+func TestProject(t *testing.T) {
 	eps := 1e-10
 	var tests []projtest = []projtest{
 		{
@@ -69,7 +69,7 @@ func TestNearest(t *testing.T) {
 		}
 		A := mat64.NewDense(len(test.A), len(test.A[0]), adata)
 		b := mat64.NewDense(len(test.b), 1, test.b)
-		got, _ := Nearest(test.x0, A, b)
+		got, _ := Project(test.x0, A, b)
 
 		for i := range got {
 			if diff := math.Abs(got[i] - test.want[i]); diff > eps {

@@ -7,7 +7,6 @@ import (
 	_ "github.com/mxk/go-sqlite/sqlite3"
 	"github.com/rwcarlsen/optim"
 	"github.com/rwcarlsen/optim/bench"
-	"github.com/rwcarlsen/optim/mesh"
 )
 
 func TestDb(t *testing.T) {
@@ -49,10 +48,10 @@ func TestDb(t *testing.T) {
 	}
 }
 
-func patternsolver(fn bench.Func, db *sql.DB) (optim.Method, mesh.Mesh) {
+func patternsolver(fn bench.Func, db *sql.DB) (optim.Method, optim.Mesh) {
 	low, up := fn.Bounds()
 	max, min := up[0], low[0]
-	m := mesh.NewBounded(&mesh.Infinite{StepSize: (max - min) / 10}, low, up)
+	m := optim.NewBounded(&optim.Infinite{StepSize: (max - min) / 10}, low, up)
 	p := optim.NewPoint(m.Origin(), 0)
 	it := New(p, DB(db))
 	return it, m

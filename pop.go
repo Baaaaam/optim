@@ -4,7 +4,6 @@ import (
 	"math"
 
 	"github.com/gonum/matrix/mat64"
-	"github.com/rwcarlsen/optim/mesh"
 )
 
 // RandPop generates n randomly positioned points in the boxed bounds defined by
@@ -44,7 +43,7 @@ func RandPopConstr(n int, lb, ub []float64, low, A, up *mat64.Dense) []Point {
 		}
 
 		// project onto feasible region
-		proj, _ := mesh.Nearest(pos, stackA, b)
+		proj, _ := Project(pos, stackA, b)
 		points = append(points, NewPoint(proj, math.Inf(1)))
 	}
 

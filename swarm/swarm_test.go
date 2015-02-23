@@ -8,7 +8,6 @@ import (
 	_ "github.com/mxk/go-sqlite/sqlite3"
 	"github.com/rwcarlsen/optim"
 	"github.com/rwcarlsen/optim/bench"
-	"github.com/rwcarlsen/optim/mesh"
 )
 
 type fakeRand struct {
@@ -226,12 +225,12 @@ func TestDb(t *testing.T) {
 	}
 }
 
-func swarmsolver(fn bench.Func, db *sql.DB) (optim.Method, mesh.Mesh) {
+func swarmsolver(fn bench.Func, db *sql.DB) (optim.Method, optim.Mesh) {
 	low, up := fn.Bounds()
 	n := 20 + 1*len(low)
 	return New(
 		NewPopulationRand(n, low, up),
 		VmaxBounds(fn.Bounds()),
 		DB(db),
-	), mesh.NewBounded(&mesh.Infinite{}, low, up)
+	), optim.NewBounded(&optim.Infinite{}, low, up)
 }

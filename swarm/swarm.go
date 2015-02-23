@@ -22,7 +22,6 @@ import (
 	"math"
 
 	"github.com/rwcarlsen/optim"
-	"github.com/rwcarlsen/optim/mesh"
 )
 
 // These parameters are calculated using a constriction factor originally
@@ -302,7 +301,7 @@ func New(pop Population, opts ...Option) *Method {
 	return m
 }
 
-func (m *Method) Iterate(obj optim.Objectiver, mesh mesh.Mesh) (best optim.Point, neval int, err error) {
+func (m *Method) Iterate(obj optim.Objectiver, mesh optim.Mesh) (best optim.Point, neval int, err error) {
 	m.count++
 
 	// project positions onto mesh
@@ -392,7 +391,7 @@ func (m *Method) initdb() {
 	}
 }
 
-func (m *Method) updateDb(mesh mesh.Mesh) {
+func (m *Method) updateDb(mesh optim.Mesh) {
 	if m.Db == nil {
 		return
 	}

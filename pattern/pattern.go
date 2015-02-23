@@ -10,7 +10,6 @@ import (
 	"sort"
 
 	"github.com/rwcarlsen/optim"
-	"github.com/rwcarlsen/optim/mesh"
 )
 
 var FoundBetterErr = errors.New("better position discovered")
@@ -105,7 +104,7 @@ func (m *Method) AddPoint(p optim.Point) {
 
 // Iterate mutates m and so for each iteration, the same, mutated m should be
 // passed in.
-func (m *Method) Iterate(o optim.Objectiver, mesh mesh.Mesh) (best optim.Point, n int, err error) {
+func (m *Method) Iterate(o optim.Objectiver, mesh optim.Mesh) (best optim.Point, n int, err error) {
 	var nevalsearch, nevalpoll int
 	var success bool
 	defer m.updateDb(&nevalsearch, &nevalpoll, mesh.Step())
@@ -269,7 +268,7 @@ func (b byval) Swap(i, j int)      { b[i], b[j] = b[j], b[i] }
 // evaluations.  If a better point was not found, it returns false, the
 // from point, and the number of evaluations.  If err is non-nil, success
 // must be false and best must be from - neval may be non-zero.
-func (cp *Poller) Poll(obj optim.Objectiver, ev optim.Evaler, m mesh.Mesh, from optim.Point) (success bool, best optim.Point, neval int, err error) {
+func (cp *Poller) Poll(obj optim.Objectiver, ev optim.Evaler, m optim.Mesh, from optim.Point) (success bool, best optim.Point, neval int, err error) {
 	best = from
 
 	pollpoints := []optim.Point{}
@@ -354,12 +353,12 @@ func (cp *Poller) Poll(obj optim.Objectiver, ev optim.Evaler, m mesh.Mesh, from 
 }
 
 type Searcher interface {
-	Search(o optim.Objectiver, m mesh.Mesh, curr optim.Point) (success bool, best optim.Point, n int, err error)
+	Search(o optim.Objectiver, m optim.Mesh, curr optim.Point) (success bool, best optim.Point, n int, err error)
 }
 
 type NullSearcher struct{}
 
-func (_ NullSearcher) Search(o optim.Objectiver, m mesh.Mesh, curr optim.Point) (success bool, best optim.Point, n int, err error) {
+func (_ NullSearcher) Search(o optim.Objectiver, m optim.Mesh, curr optim.Point) (success bool, best optim.Point, n int, err error) {
 	return false, curr, 0, nil // TODO: test that this returns curr instead of something else
 }
 
@@ -370,7 +369,7 @@ type WrapSearcher struct {
 	Share bool
 }
 
-func (s *WrapSearcher) Search(o optim.Objectiver, m mesh.Mesh, curr optim.Point) (success bool, best optim.Point, n int, err error) {
+func (s *WrapSearcher) Search(o optim.Objectiver, m optim.Mesh, curr optim.Point) (success bool, best optim.Point, n int, err error) {
 	if s.Share {
 		s.Method.AddPoint(curr)
 	}
@@ -404,7 +403,7 @@ func (s *objStopper) Objective(v []float64) (float64, error) {
 	return obj, nil
 }
 
-func genPollPoints(from optim.Point, span SpanFunc, m mesh.Mesh) []optim.Point {
+func genPollPoints(from optim.Point, span SpanFunc, m optim.Mesh) []optim.Point {
 	ndim := from.Len()
 	dirs := span(ndim)
 	polls := make([]optim.Point, 0, len(dirs))
@@ -414,7 +413,7 @@ func genPollPoints(from optim.Point, span SpanFunc, m mesh.Mesh) []optim.Point {
 	return polls
 }
 
-func pointFromDirec(from optim.Point, direc []int, m mesh.Mesh) optim.Point {
+func pointFromDirec(from optim.Point, direc []int, m optim.Mesh) optim.Point {
 	pos := make([]float64, from.Len())
 	step := m.Step()
 	for i := range pos {
@@ -513,7 +512,7 @@ func pos2iface(pos []float64) []interface{} {
 	return iface
 }
 
-func direcbetween(from, to optim.Point, m mesh.Mesh) []int {
+func direcbetween(from, to optim.Point, m optim.Mesh) []int {
 	d := make([]int, from.Len())
 	step := m.Step()
 	for i := 0; i < from.Len(); i++ {

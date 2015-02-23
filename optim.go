@@ -10,7 +10,6 @@ import (
 	"sync"
 
 	"github.com/gonum/matrix/mat64"
-	"github.com/rwcarlsen/optim/mesh"
 )
 
 var Rand Rng = rand.New(rand.NewSource(1))
@@ -26,7 +25,7 @@ func RandFloat() float64 { return Rand.Float64() }
 type Solver struct {
 	Method       Method
 	Obj          Objectiver
-	Mesh         mesh.Mesh
+	Mesh         Mesh
 	MaxIter      int
 	MaxEval      int
 	MaxNoImprove int
@@ -51,7 +50,7 @@ func (s *Solver) Run() error {
 
 func (s *Solver) Next() (more bool) {
 	if s.Mesh == nil {
-		s.Mesh = &mesh.Infinite{}
+		s.Mesh = &Infinite{}
 	}
 	if s.niter == 0 {
 		s.best.Val = math.Inf(1)
@@ -123,7 +122,7 @@ func (p Point) String() string {
 type Method interface {
 	// Iterate runs a single iteration of a solver and reports the number of
 	// function evaluations n and the best point.
-	Iterate(obj Objectiver, m mesh.Mesh) (best Point, n int, err error)
+	Iterate(obj Objectiver, m Mesh) (best Point, n int, err error)
 
 	// AddPoint enables limited hybriding of different optimization iterators
 	// by allowing iterators/solvers to add share information by suggesting
@@ -357,7 +356,7 @@ func (o *ObjectivePenalty) Objective(v []float64) (float64, error) {
 	return val * (1 + penalty), err
 }
 
-func Nearest(p Point, m mesh.Mesh) Point {
+func Nearest(p Point, m Mesh) Point {
 	return NewPoint(m.Nearest(p.pos), p.Val)
 }
 

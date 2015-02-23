@@ -9,7 +9,6 @@ import (
 	_ "github.com/mxk/go-sqlite/sqlite3"
 	"github.com/rwcarlsen/optim"
 	"github.com/rwcarlsen/optim/bench"
-	"github.com/rwcarlsen/optim/mesh"
 	"github.com/rwcarlsen/optim/pattern"
 	"github.com/rwcarlsen/optim/swarm"
 )
@@ -171,10 +170,10 @@ func TestOverviewPSwarm(t *testing.T) {
 	}
 }
 
-func patternsolver(fn bench.Func, db *sql.DB) (*pattern.Method, mesh.Mesh) {
+func patternsolver(fn bench.Func, db *sql.DB) (*pattern.Method, optim.Mesh) {
 	low, up := fn.Bounds()
 	max, min := up[0], low[0]
-	mesh := &mesh.Infinite{StepSize: (max - min) / 10}
+	mesh := &optim.Infinite{StepSize: (max - min) / 10}
 	p := initialpoint(fn)
 	mesh.SetOrigin(p.Pos())
 	return pattern.New(p, pattern.DB(db)), mesh
@@ -197,10 +196,10 @@ func swarmsolver(fn bench.Func, db *sql.DB, n int) optim.Method {
 	)
 }
 
-func pswarmsolver(fn bench.Func, db *sql.DB, n int) (*pattern.Method, mesh.Mesh) {
+func pswarmsolver(fn bench.Func, db *sql.DB, n int) (*pattern.Method, optim.Mesh) {
 	low, up := fn.Bounds()
 	max, min := up[0], low[0]
-	mesh := &mesh.Infinite{StepSize: (max - min) / 10}
+	mesh := &optim.Infinite{StepSize: (max - min) / 10}
 	p := initialpoint(fn)
 	mesh.SetOrigin(p.Pos())
 

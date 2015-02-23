@@ -1,4 +1,4 @@
-package mesh
+package optim
 
 import (
 	"math"
@@ -7,8 +7,9 @@ import (
 )
 
 // OrthoProj computes the orthogonal projection of x0 onto the affine subspace
-// defined by Ax=b which is the intersection of affine hyperplanes that
-// constitute the rows of A with associated shifts in b.  The equation is:
+// defined by Ax=b which is the intersection of affine halfspaces
+// (hyperplanes) that constitute the rows of A with associated shifts in b.
+// The equation is:
 //
 //    proj = [I - A^T * (A * A^T)^-1 * A]*x0 + A^T * (A * A^T)^-1 * b
 //
@@ -65,9 +66,9 @@ func eye(n int) *mat64.Dense {
 	return m
 }
 
-// Nearest returns the nearest point to x0 that doesn't violate constraints in
+// Project returns the nearest point to x0 that doesn't violate constraints in
 // the equation Ax <= b.
-func Nearest(x0 []float64, A, b *mat64.Dense) (proj []float64, success bool) {
+func Project(x0 []float64, A, b *mat64.Dense) (proj []float64, success bool) {
 	from := x0
 	proj = x0
 	var badA *mat64.Dense
