@@ -81,42 +81,26 @@ func (s *Solver) Next() (more bool) {
 }
 
 type Point struct {
-	pos []float64
+	Pos []float64
 	Val float64
 }
 
-func NewPoint(pos []float64, val float64) Point {
-	cpos := make([]float64, len(pos))
-	copy(cpos, pos)
-	return Point{pos: cpos, Val: val}
+func (p *Point) Len() int             { return len(p.Pos) }
+func (p *Point) Matrix() *mat64.Dense { return mat64.NewDense(p.Len(), 1, p.Pos) }
+func (p *Point) String() string       { return fmt.Sprintf("f%v = %v", p.Pos, p.Val) }
+
+func (p *Point) Clone() *Point {
+	pos := make([]float64, len(p.Pos))
+	copy(pos, p.Pos)
+	return &Point{Pos: pos, Val: p.Val}
 }
 
-func (p Point) At(i int) float64 { return p.pos[i] }
-
-func (p Point) Len() int { return len(p.pos) }
-
-func (p Point) Clone() Point { return NewPoint(p.pos, p.Val) }
-
-func (p Point) Hash() [sha1.Size]byte {
+func (p *Point) Hash() [sha1.Size]byte {
 	data := make([]byte, p.Len()*8)
 	for i := 0; i < p.Len(); i++ {
-		binary.BigEndian.PutUint64(data[i*8:], math.Float64bits(p.pos[i]))
+		binary.BigEndian.PutUint64(data[i*8:], math.Float64bits(p.Pos[i]))
 	}
 	return sha1.Sum(data)
-}
-
-func (p Point) Matrix() *mat64.Dense {
-	return mat64.NewDense(p.Len(), 1, p.Pos())
-}
-
-func (p Point) Pos() []float64 {
-	pos := make([]float64, len(p.pos))
-	copy(pos, p.pos)
-	return pos
-}
-
-func (p Point) String() string {
-	return fmt.Sprintf("f%v = %v", p.pos, p.Val)
 }
 
 type Method interface {
@@ -136,7 +120,7 @@ type Evaler interface {
 	// in the results slice, they should have objective value set to
 	// +Infinity. The order of points in results must be the same as the order
 	// of the passed in points.  len(results) may be less than len(points).
-	Eval(obj Objectiver, points ...Point) (results []Point, n int, err error)
+	Eval(obj Objectiver, points ...Point) (results []*Point, n int, err error)
 }
 
 type Objectiver interface {
@@ -163,10 +147,10 @@ func NewCacheEvaler(ev Evaler) *CacheEvaler {
 	}
 }
 
-func (ev *CacheEvaler) Eval(obj Objectiver, points ...Point) (results []Point, n int, err error) {
+func (ev *CacheEvaler) Eval(obj Objectiver, points ...Point) (results []*Point, n int, err error) {
 	results = points
 	fromnew := make([]int, 0, len(points))
-	newp := make([]Point, 0, len(points))
+	newp := make([]*Point, 0, len(points))
 	for i, p := range points {
 		h := p.Hash()
 		if val, ok := ev.cache[h]; ok {
@@ -201,8 +185,8 @@ type SerialEvaler struct {
 	ContinueOnErr bool
 }
 
-func (ev SerialEvaler) Eval(obj Objectiver, points ...Point) (results []Point, n int, err error) {
-	results = make([]Point, len(points))
+func (ev SerialEvaler) Eval(obj Objectiver, points ...Point) (results []*Point, n int, err error) {
+	results = make([]*Point, len(points))
 
 	indexes := uniqof(points)
 	defer fillfromuniq(indexes, results)
@@ -213,7 +197,7 @@ func (ev SerialEvaler) Eval(obj Objectiver, points ...Point) (results []Point, n
 			continue
 		}
 
-		p.Val, err = obj.Objective(p.Pos())
+		p.Val, err = obj.Objective(p.Pos)
 		n++
 		results[i] = p
 		if err != nil && !ev.ContinueOnErr {
@@ -233,7 +217,7 @@ type errpoint struct {
 // uniqof returns a set of indexes that map a point index into another index
 // in the same point slice that can be used go get objective values of
 // duplicate positions.  If a point has a unique position, indexes[i] = i.
-func uniqof(points []Point) (indexes []int) {
+func uniqof(points []*Point) (indexes []int) {
 	indexes = make([]int, len(points))
 	alreadyhave := map[[sha1.Size]byte]int{}
 	for i, p := range points {
@@ -248,7 +232,7 @@ func uniqof(points []Point) (indexes []int) {
 	return indexes
 }
 
-func fillfromuniq(indexes []int, points []Point) {
+func fillfromuniq(indexes []int, points []*Point) {
 	for i := range points {
 		if v := indexes[i]; v != i {
 			points[i] = points[v].Clone()
@@ -258,7 +242,7 @@ func fillfromuniq(indexes []int, points []Point) {
 
 type ParallelEvaler struct{}
 
-func (ev ParallelEvaler) Eval(obj Objectiver, points ...Point) (results []Point, n int, err error) {
+func (ev ParallelEvaler) Eval(obj Objectiver, points ...Point) (results []*Point, n int, err error) {
 	ch := make(chan errpoint, len(points))
 	wg := sync.WaitGroup{}
 	indexes := uniqof(points)
@@ -282,7 +266,7 @@ func (ev ParallelEvaler) Eval(obj Objectiver, points ...Point) (results []Point,
 		close(ch)
 	}()
 
-	results = make([]Point, len(points))
+	results = make([]*Point, len(points))
 	for p := range ch {
 		n++
 		results[p.Index] = p.Point
@@ -354,10 +338,6 @@ func (o *ObjectivePenalty) Objective(v []float64) (float64, error) {
 	}
 
 	return val * (1 + penalty), err
-}
-
-func Nearest(p Point, m Mesh) Point {
-	return NewPoint(m.Nearest(p.pos), p.Val)
 }
 
 func L2Dist(p1, p2 Point) float64 {
