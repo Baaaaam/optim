@@ -312,8 +312,10 @@ func (fn Rosenbrock) Eval(x []float64) float64 {
 
 	tot := 0.0
 	for i := 0; i < fn.NDim-1; i++ {
-		tot += 100 * math.Pow(x[i+1]-x[i]*x[i], 2)
-		tot += math.Pow(x[i]-1, 2)
+		diff1 := x[i+1] - x[i]*x[i]
+		tot += 100 * diff1 * diff1
+		diff2 := x[i] - 1
+		tot += diff2 * diff2
 	}
 	return tot
 }
