@@ -11,8 +11,9 @@ import (
 // kind of (potentially discrete) mesh.
 type Mesh interface {
 	Step() float64
-	// Nearest returns the nearest
-	Nearest(p []float64) []float64
+	// Nearest returns the nearest location to x on the mesh.  x must have the
+	// same dimensionality as the mesh.  Nearest never modifies x.
+	Nearest(x []float64) []float64
 	SetStep(step float64)
 	SetOrigin(origin []float64)
 	Origin() []float64

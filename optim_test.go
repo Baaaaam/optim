@@ -2,19 +2,20 @@ package optim
 
 import (
 	"errors"
+	"fmt"
 	"math"
 	"sync"
 	"testing"
 )
 
-func testpoints() []Point {
-	return []Point{
-		NewPoint([]float64{1, 2, 3}, 0),
-		NewPoint([]float64{1, 2, 3}, 0), // duplicate point on purpose
-		NewPoint([]float64{1, 2, 4}, 0),
-		NewPoint([]float64{1, 2, 5}, 0),
-		NewPoint([]float64{1, 2, 6}, 0),
-		NewPoint([]float64{1, 2, 7}, 0),
+func testpoints() []*Point {
+	return []*Point{
+		&Point{[]float64{1, 2, 3}, 0},
+		&Point{[]float64{1, 2, 3}, 0}, // duplicate point on purpose
+		&Point{[]float64{1, 2, 4}, 0},
+		&Point{[]float64{1, 2, 5}, 0},
+		&Point{[]float64{1, 2, 6}, 0},
+		&Point{[]float64{1, 2, 7}, 0},
 	}
 }
 
@@ -40,30 +41,25 @@ func (o *ObjTest) Objective(x []float64) (float64, error) {
 }
 
 func TestUniqOfPoints(t *testing.T) {
-	wantindexes := []int{0, 0, 2, 3, 4, 5}
-
-	// check uniqof func
 	points := testpoints()
-	indexes := uniqof(points)
-	for i, got := range indexes {
-		if got != wantindexes[i] {
-			t.Errorf("indexes[%v] WRONG: want %v, got %v", i, wantindexes[i], got)
-		} else {
-			t.Logf("indexes[%v] right: got %v", i, got)
+	want := map[*Point]bool{}
+	want[points[0]] = true
+	want[points[2]] = true
+	want[points[3]] = true
+	want[points[4]] = true
+	want[points[5]] = true
+
+	uniq := uniqof(points)
+	uniqmap := map[*Point]bool{}
+	for _, p := range uniq {
+		uniqmap[p] = true
+		if !want[p] {
+			t.Errorf("uniqof returned duplicate point")
 		}
 	}
-
-	// check fillfromuniq func
-	wantvals := []float64{0, 0, 2, 3, 4, 5}
-	for i := range points {
-		points[i].Val = float64(i)
-	}
-	fillfromuniq(indexes, points)
-	for i, got := range points {
-		if got.Val != wantvals[i] {
-			t.Errorf("filled points[%v].Val WRONG: want %v, got %v", i, wantvals[i], got)
-		} else {
-			t.Logf("filled points[%v].Val right: got %v", i, got)
+	for p, want := range want {
+		if want != uniqmap[p] {
+			t.Errorf("uniqof excluded non-duplicate point")
 		}
 	}
 }
@@ -79,7 +75,7 @@ func TestSerialEvaler_DupPoints(t *testing.T) {
 	for i, p := range r {
 		orig := dups[i]
 		for k := 0; k < p.Len(); k++ {
-			if p.At(k) != orig.At(k) {
+			if p.Pos[k] != p.Pos[k] {
 				t.Errorf("result[%v] wrong point: want %v, got %v", orig, p)
 				break
 			}
@@ -89,8 +85,8 @@ func TestSerialEvaler_DupPoints(t *testing.T) {
 
 func TestSerialEvalerErr(t *testing.T) {
 	errcount := 3
-	exprlen := errcount + 1 // we get an extra obj call due to duplicate avoidance
-	expn := exprlen - 1
+	exprlen := errcount
+	expn := exprlen
 	obj := &ObjTest{max: errcount}
 	ev := SerialEvaler{}
 
@@ -109,13 +105,15 @@ func TestSerialEvalerErr(t *testing.T) {
 	}
 
 	// exclude last entry in r because it was the error'd obj evaluation
-	for i, p := range r[:len(r)-1] {
-		expobj := 0.0
-		for _, v := range tpoints[i].Pos() {
-			expobj += v
-		}
-		if p.Val != expobj {
-			t.Errorf("point %v (%v) objective value: expected %v, got %v", i, tpoints[i].Pos(), expobj, p.Val)
+
+	want := map[*Point]bool{
+		tpoints[0]: true,
+		tpoints[2]: true,
+		tpoints[3]: true,
+	}
+	for i, p := range r {
+		if !want[p] {
+			t.Errorf("result point %v (%v) was not expected", i, p)
 		}
 	}
 }
@@ -123,8 +121,8 @@ func TestSerialEvalerErr(t *testing.T) {
 func TestParallelEvalerErr(t *testing.T) {
 	tpoints := testpoints()
 	errcount := 4
-	exprlen := len(tpoints)
-	expn := exprlen - 1
+	exprlen := len(tpoints) - 1 // for duplicate
+	expn := exprlen
 	obj := &ObjTest{max: errcount}
 	ev := ParallelEvaler{}
 
@@ -144,13 +142,13 @@ func TestParallelEvalerErr(t *testing.T) {
 		t.Errorf("did not propagate error through return")
 	}
 
-	for i, p := range r[:errcount-1] {
+	for i, p := range r {
 		expobj := 0.0
-		for _, v := range tpoints[i].Pos() {
+		for _, v := range p.Pos {
 			expobj += v
 		}
-		if p.Val != expobj {
-			t.Errorf("point %v (%v) objective value: expected %v, got %v", i, tpoints[i].Pos(), expobj, p.Val)
+		if p.Val != expobj && p.Val != math.Inf(1) {
+			t.Errorf("point %v (%v) objective value: expected %v, got %v", i, p.Pos, expobj, p.Val)
 		}
 	}
 }
@@ -158,8 +156,8 @@ func TestParallelEvalerErr(t *testing.T) {
 func TestCacheEvalerErr(t *testing.T) {
 	tpoints := testpoints()
 	errcount := 3
-	exprlen := errcount + 1 // we get an extra obj call due to duplicate avoidance
-	expn := exprlen - 1
+	exprlen := errcount
+	expn := exprlen
 	obj := &ObjTest{max: errcount}
 	ev := NewCacheEvaler(SerialEvaler{})
 
@@ -181,12 +179,15 @@ func TestCacheEvaler(t *testing.T) {
 	obj := &ObjTest{max: 100000}
 	ev := NewCacheEvaler(SerialEvaler{})
 	expn := len(tpoints) - 1
+	exprlen := 2 * (len(tpoints) - 1) // for duplicate
 
 	r1, n1, err1 := ev.Eval(obj, tpoints...)
 	r2, n2, err2 := ev.Eval(obj, tpoints...)
+	fmt.Println(n1)
+	fmt.Println(n2)
 
-	if v := len(r1) + len(r2); v != 2*len(tpoints) {
-		t.Errorf("returned wrong number of results: expected %v, got %v", 2*len(tpoints), v)
+	if v := len(r1) + len(r2); v != exprlen {
+		t.Errorf("returned wrong number of results: expected %v, got %v", exprlen, v)
 	}
 	if n1+n2 != expn {
 		t.Errorf("returned wrong evaluation count: expected %v, got %v", expn, n1+n2)
@@ -195,13 +196,15 @@ func TestCacheEvaler(t *testing.T) {
 		t.Errorf("got unexpected err (err1 and err2): %v and %v", err1, err2)
 	}
 
+	tpoints = testpoints()
+	tpoints = append(tpoints[:1], tpoints[2:]...) // results should exclude the single duplicate point
 	for i := range r1 {
-		for j := range tpoints[i].Pos() {
-			if exp, got := tpoints[i].At(j), r1[i].At(j); exp != got {
-				t.Errorf("bad pos: expected %+v, got %+v", exp, got)
+		for j := range tpoints[i].Pos {
+			if exp, got := tpoints[i].Pos[j], r1[i].Pos[j]; exp != got {
+				t.Errorf("bad pos: expected %+v, got %+v", tpoints[i].Pos, r1[i].Pos)
 			}
-			if exp, got := tpoints[i].At(j), r2[i].At(j); exp != got {
-				t.Errorf("bad cached pos: expected %+v, got %+v", exp, got)
+			if exp, got := tpoints[i].Pos[j], r2[i].Pos[j]; exp != got {
+				t.Errorf("bad cached pos: expected %+v, got %+v", tpoints[i].Pos, r2[i].Pos)
 			}
 		}
 	}
