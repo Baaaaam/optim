@@ -56,7 +56,7 @@ func TestSimple(t *testing.T) {
 	maxulps := uint64(1)
 
 	for i, prob := range tests {
-		m := &Infinite{StepSize: prob.Step, Basis: prob.Basis, Center: prob.Origin}
+		m := &InfMesh{StepSize: prob.Step, Basis: prob.Basis, Center: prob.Origin}
 		got := m.Nearest(prob.Point)
 		t.Logf("prob %v:", i)
 		for j := range got {

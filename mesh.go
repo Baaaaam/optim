@@ -18,11 +18,11 @@ type Mesh interface {
 	Origin() []float64
 }
 
-type Integer struct {
+type IntMesh struct {
 	Mesh
 }
 
-func (m *Integer) Nearest(p []float64) []float64 {
+func (m *IntMesh) Nearest(p []float64) []float64 {
 	gridp := m.Mesh.Nearest(p)
 	for i := range gridp {
 		gridp[i] = math.Floor(gridp[i] + .5) // round to nearest int
@@ -30,11 +30,11 @@ func (m *Integer) Nearest(p []float64) []float64 {
 	return gridp
 }
 
-func (m *Integer) SetStep(step float64) {
+func (m *IntMesh) SetStep(step float64) {
 	m.Mesh.SetStep(math.Max(step, 1))
 }
 
-func (m *Integer) SetOrigin(origin []float64) {
+func (m *IntMesh) SetOrigin(origin []float64) {
 	m.Mesh.SetOrigin(m.Nearest(origin))
 }
 
@@ -44,7 +44,7 @@ func (m *Integer) SetOrigin(origin []float64) {
 // Nearest.  If Basis == nil, a unit basis (the identify matrix) is used.  If
 // Step == 0, then the mesh represents continuous space and the Nearest method
 // just returns the point passed to it.
-type Infinite struct {
+type InfMesh struct {
 	Center []float64
 	// Basis contains a set of row vectors defining the directions of each
 	// mesh axis for the car.
@@ -54,16 +54,16 @@ type Infinite struct {
 	inverter *mat64.Dense
 }
 
-func (m *Infinite) Step() float64              { return m.StepSize }
-func (m *Infinite) SetStep(step float64)       { m.StepSize = step }
-func (m *Infinite) Origin() []float64          { return m.Center }
-func (m *Infinite) SetOrigin(origin []float64) { m.Center = origin }
+func (m *InfMesh) Step() float64              { return m.StepSize }
+func (m *InfMesh) SetStep(step float64)       { m.StepSize = step }
+func (m *InfMesh) Origin() []float64          { return m.Center }
+func (m *InfMesh) SetOrigin(origin []float64) { m.Center = origin }
 
 // Nearest returns the nearest grid point to p by rounding each dimensional
 // position to the nearest grid point.  If the mesh basis is not the identity
 // matrix, then p is transformed to the mesh basis before rounding and then
 // retransformed back.
-func (m *Infinite) Nearest(p []float64) []float64 {
+func (m *InfMesh) Nearest(p []float64) []float64 {
 	if m.StepSize == 0 {
 		return append([]float64{}, p...)
 	} else if l := len(m.Center); l != 0 && l != len(p) {
@@ -114,23 +114,10 @@ func (m *Infinite) Nearest(p []float64) []float64 {
 	return nv
 }
 
-type Bounded struct {
+type BoxMesh struct {
+	Mesh
 	Lower []float64
 	Upper []float64
-	Mesh
-}
-
-func NewBounded(m Mesh, lower, upper []float64) *Bounded {
-	if len(lower) != len(upper) {
-		panic("mesh lower and upper bound vectors have difference lengths")
-	} else { // force panic if bounds lengths don't math mesh m's # dims
-		m.Nearest(lower)
-	}
-	return &Bounded{
-		Lower: lower,
-		Upper: upper,
-		Mesh:  m,
-	}
 }
 
 // Nearest returns the nearest bounded grid point to p by sliding each
@@ -138,7 +125,7 @@ func NewBounded(m Mesh, lower, upper []float64) *Bounded {
 // to the nearest grid point.  If the mesh basis is not the identity matrix,
 // then p is transformed to the mesh basis before rounding and then
 // retransformed back.
-func (m *Bounded) Nearest(p []float64) []float64 {
+func (m *BoxMesh) Nearest(p []float64) []float64 {
 	pdup := make([]float64, len(p))
 	copy(pdup, p)
 	for i := range pdup {
@@ -148,7 +135,7 @@ func (m *Bounded) Nearest(p []float64) []float64 {
 	return m.Mesh.Nearest(pdup)
 }
 
-type Constr struct {
+type ConstrMesh struct {
 	A, B *mat64.Dense
 	Mesh
 }
@@ -157,7 +144,7 @@ type Constr struct {
 // satisfies the constraint equation Ax <= b.  The projection onto the
 // feasible region occurs before the snap-to-grid for the underlying mesh step
 // size - so it is possible that the returned point is not actually feasible.
-func (m *Constr) Nearest(p []float64) []float64 {
+func (m *ConstrMesh) Nearest(p []float64) []float64 {
 	pdup := make([]float64, len(p))
 	copy(pdup, p)
 	pdup, _ = Project(pdup, m.A, m.B)

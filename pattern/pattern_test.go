@@ -51,7 +51,7 @@ func TestDb(t *testing.T) {
 func patternsolver(fn bench.Func, db *sql.DB) (optim.Method, optim.Mesh) {
 	low, up := fn.Bounds()
 	max, min := up[0], low[0]
-	m := optim.NewBounded(&optim.Infinite{StepSize: (max - min) / 10}, low, up)
+	m := &optim.BoxMesh{&optim.InfMesh{StepSize: (max - min) / 10}, low, up}
 	p := optim.NewPoint(m.Origin(), 0)
 	it := New(p, DB(db))
 	return it, m

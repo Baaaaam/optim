@@ -232,5 +232,5 @@ func swarmsolver(fn bench.Func, db *sql.DB) (optim.Method, optim.Mesh) {
 		NewPopulationRand(n, low, up),
 		VmaxBounds(fn.Bounds()),
 		DB(db),
-	), optim.NewBounded(&optim.Infinite{}, low, up)
+	), &optim.BoxMesh{&optim.InfMesh{}, low, up}
 }
