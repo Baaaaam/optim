@@ -77,12 +77,12 @@ func Constriction(c1, c2 float64) float64 {
 
 type Particle struct {
 	Id int
-	optim.Point
+	*optim.Point
 	Vel  []float64
-	Best optim.Point
+	Best *optim.Point
 }
 
-func (p *Particle) Move(gbest optim.Point, vmax []float64, inertia, social, cognition float64) {
+func (p *Particle) Move(gbest *optim.Point, vmax []float64, inertia, social, cognition float64) {
 	// update velocity
 	for i, currv := range p.Vel {
 		// random numbers r1 and r2 MUST go inside this loop and be generated
@@ -90,8 +90,8 @@ func (p *Particle) Move(gbest optim.Point, vmax []float64, inertia, social, cogn
 		r1 := optim.RandFloat()
 		r2 := optim.RandFloat()
 		p.Vel[i] = inertia*currv +
-			cognition*r1*(p.Best.At(i)-p.At(i)) +
-			social*r2*(gbest.At(i)-p.At(i))
+			cognition*r1*(p.Best.Pos[i]-p.Pos[i]) +
+			social*r2*(gbest.Pos[i]-p.Pos[i])
 		if math.Abs(p.Vel[i]) > vmax[i] {
 			p.Vel[i] = math.Copysign(vmax[i], p.Vel[i])
 		}
@@ -100,12 +100,12 @@ func (p *Particle) Move(gbest optim.Point, vmax []float64, inertia, social, cogn
 	// update position
 	pos := make([]float64, p.Len())
 	for i := range pos {
-		pos[i] = p.At(i) + p.Vel[i]
+		pos[i] = p.Pos[i] + p.Vel[i]
 	}
-	p.Point = optim.NewPoint(pos, math.Inf(1))
+	p.Point = &optim.Point{pos, math.Inf(1)}
 }
 
-func (p *Particle) Kill(gbest optim.Point, xtol, vtol float64) bool {
+func (p *Particle) Kill(gbest *optim.Point, xtol, vtol float64) bool {
 	if xtol == 0 || vtol == 0 {
 		return false
 	}
@@ -120,7 +120,7 @@ func (p *Particle) Kill(gbest optim.Point, xtol, vtol float64) bool {
 	return (totv < vtol*vtol) && (diffx < xtol*xtol)
 }
 
-func (p *Particle) Update(newp optim.Point) {
+func (p *Particle) Update(newp *optim.Point) {
 	// DO NOT update p's position with newp's position - it may have been
 	// projected onto a mesh and be different.
 	p.Val = newp.Val
@@ -135,7 +135,7 @@ type Population []*Particle
 // and generates velocities for each dimension i initialized to uniform random
 // values between minv[i] and maxv[i].  github.com/rwcarlsen/optim.Rand is
 // used for random numbers.
-func NewPopulation(points []optim.Point, vmax []float64) Population {
+func NewPopulation(points []*optim.Point, vmax []float64) Population {
 	pop := make(Population, len(points))
 	for i, p := range points {
 		pop[i] = &Particle{
@@ -158,8 +158,8 @@ func NewPopulationRand(n int, low, up []float64) Population {
 	return NewPopulation(points, vmaxfrombounds(low, up))
 }
 
-func (pop Population) Points() []optim.Point {
-	points := make([]optim.Point, 0, len(pop))
+func (pop Population) Points() []*optim.Point {
+	points := make([]*optim.Point, 0, len(pop))
 	for _, p := range pop {
 		points = append(points, p.Point)
 	}
@@ -274,7 +274,7 @@ type Method struct {
 	Vmax  []float64
 	Db    *sql.DB
 	count int
-	best  optim.Point
+	best  *optim.Point
 }
 
 func New(pop Population, opts ...Option) *Method {
@@ -301,7 +301,7 @@ func New(pop Population, opts ...Option) *Method {
 	return m
 }
 
-func (m *Method) Iterate(obj optim.Objectiver, mesh optim.Mesh) (best optim.Point, neval int, err error) {
+func (m *Method) Iterate(obj optim.Objectiver, mesh optim.Mesh) (best *optim.Point, neval int, err error) {
 	m.count++
 
 	// project positions onto mesh
@@ -315,7 +315,7 @@ func (m *Method) Iterate(obj optim.Objectiver, mesh optim.Mesh) (best optim.Poin
 	// evaluate current positions
 	results, n, err := m.Evaler.Eval(obj, points...)
 	if err != nil {
-		return optim.Point{Val: math.Inf(1)}, n, err
+		return &optim.Point{Val: math.Inf(1)}, n, err
 	}
 	for i := range results {
 		m.Pop[i].Update(results[i])
@@ -344,7 +344,7 @@ func (m *Method) Iterate(obj optim.Objectiver, mesh optim.Mesh) (best optim.Poin
 	return m.best, n, nil
 }
 
-func (m *Method) AddPoint(p optim.Point) {
+func (m *Method) AddPoint(p *optim.Point) {
 	if p.Val < m.best.Val {
 		m.best = p
 	}
