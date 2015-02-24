@@ -135,10 +135,10 @@ func mostviolated(x0 []float64, A, b *mat64.Dense) (Aviol, bviol *mat64.Dense) {
 	return mat64.NewDense(1, len(x0), A.Row(nil, worstRow)), mat64.NewDense(1, 1, b.Row(nil, worstRow))
 }
 
-func l2norm(v []float64) float64 {
+func l2norm(x []float64) float64 {
 	tot := 0.0
-	for _, x := range v {
-		tot += x * x
+	for _, xi := range x {
+		tot += xi * xi
 	}
 	return math.Sqrt(tot)
 }
