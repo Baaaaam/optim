@@ -419,7 +419,11 @@ func (m *Method) updateDb(mesh optim.Mesh) {
 		}
 
 		args = []interface{}{p.Id, m.count, p.Val}
-		args = append(args, pos2iface(mesh.Nearest(p.Pos))...)
+		if mesh != nil {
+			args = append(args, pos2iface(mesh.Nearest(p.Pos))...)
+		} else {
+			args = append(args, pos2iface(p.Pos)...)
+		}
 		_, err = tx.Exec(s0b, args...)
 		if checkdberr(err) {
 			return

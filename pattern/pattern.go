@@ -110,13 +110,11 @@ func (m *Method) Iterate(o optim.Objectiver, mesh optim.Mesh) (best *optim.Point
 	defer m.updateDb(&nevalsearch, &nevalpoll, mesh.Step())
 	m.count++
 
-	prevstep := mesh.Step()
 	if !m.DiscreteSearch {
-		mesh.SetStep(0)
+		success, best, nevalsearch, err = m.Searcher.Search(o, nil, m.Curr)
+	} else {
+		success, best, nevalsearch, err = m.Searcher.Search(o, mesh, m.Curr)
 	}
-
-	success, best, nevalsearch, err = m.Searcher.Search(o, mesh, m.Curr)
-	mesh.SetStep(prevstep)
 
 	n += nevalsearch
 	if err != nil {

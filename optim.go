@@ -105,7 +105,8 @@ func (p *Point) Hash() [sha1.Size]byte {
 
 type Method interface {
 	// Iterate runs a single iteration of a solver and reports the number of
-	// function evaluations n and the best point.
+	// function evaluations n and the best point.  m may be nil in which case
+	// the method should use a continuous mesh (i.e. no projection/gridding).
 	Iterate(obj Objectiver, m Mesh) (best *Point, n int, err error)
 	// AddPoint enables limited hybriding of different optimization iterators
 	// by allowing iterators/solvers to add share information by suggesting

@@ -109,7 +109,7 @@ func Project(x0 []float64, A, b *mat64.Dense) (proj []float64, success bool) {
 // x0 violates no constraints.  The most violated constraint is the one where
 // the (orthogonal) distance from x0 to the constraint/hyperplane is largest.
 func mostviolated(x0 []float64, A, b *mat64.Dense) (Aviol, bviol *mat64.Dense) {
-	eps := 1e-5
+	eps := 1e-7
 
 	ax := &mat64.Dense{}
 	xm := mat64.NewDense(len(x0), 1, x0)
@@ -121,7 +121,7 @@ func mostviolated(x0 []float64, A, b *mat64.Dense) (Aviol, bviol *mat64.Dense) {
 	for i := 0; i < m; i++ {
 		if diff := ax.At(i, 0) - b.At(i, 0); diff > eps {
 			// compute distance from x0 to plane of this violated constraint
-			d := (ax.At(i, 0) - b.At(i, 0)) / l2norm(A.Row(nil, i))
+			d := diff / l2norm(A.Row(nil, i))
 			if d > farthest {
 				farthest = d
 				worstRow = i
