@@ -33,14 +33,14 @@ type Solver struct {
 
 	neval, niter int
 	noimprove    int
-	best         Point
+	best         *Point
 	err          error
 }
 
-func (s *Solver) Best() Point { return s.best }
-func (s *Solver) Niter() int  { return s.niter }
-func (s *Solver) Neval() int  { return s.neval }
-func (s *Solver) Err() error  { return s.err }
+func (s *Solver) Best() *Point { return s.best }
+func (s *Solver) Niter() int   { return s.niter }
+func (s *Solver) Neval() int   { return s.neval }
+func (s *Solver) Err() error   { return s.err }
 
 func (s *Solver) Run() error {
 	for s.Next() {
@@ -53,11 +53,11 @@ func (s *Solver) Next() (more bool) {
 		s.Mesh = &InfMesh{}
 	}
 	if s.niter == 0 {
-		s.best.Val = math.Inf(1)
+		s.best = &Point{Val: math.Inf(1)}
 	}
 
 	var n int
-	var best Point
+	var best *Point
 	best, n, s.err = s.Method.Iterate(s.Obj, s.Mesh)
 	s.neval += n
 	s.niter++
@@ -106,12 +106,11 @@ func (p *Point) Hash() [sha1.Size]byte {
 type Method interface {
 	// Iterate runs a single iteration of a solver and reports the number of
 	// function evaluations n and the best point.
-	Iterate(obj Objectiver, m Mesh) (best Point, n int, err error)
-
+	Iterate(obj Objectiver, m Mesh) (best *Point, n int, err error)
 	// AddPoint enables limited hybriding of different optimization iterators
 	// by allowing iterators/solvers to add share information by suggesting
 	// points to each other.
-	AddPoint(p Point)
+	AddPoint(p *Point)
 }
 
 type Evaler interface {

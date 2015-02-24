@@ -72,7 +72,7 @@ type Method struct {
 	ev             optim.Evaler
 	Poller         *Poller
 	Searcher       Searcher
-	Curr           optim.Point
+	Curr           *optim.Point
 	DiscreteSearch bool // true to project search points onto poll step size mesh
 	NsuccessGrow   int  // number of successive successful polls before growing mesh
 	nsuccess       int  // (internal) number of successive successful polls
@@ -80,7 +80,7 @@ type Method struct {
 	count          int
 }
 
-func New(start optim.Point, opts ...Option) *Method {
+func New(start *optim.Point, opts ...Option) *Method {
 	m := &Method{
 		Curr:         start,
 		ev:           optim.SerialEvaler{},
@@ -96,7 +96,7 @@ func New(start optim.Point, opts ...Option) *Method {
 	return m
 }
 
-func (m *Method) AddPoint(p optim.Point) {
+func (m *Method) AddPoint(p *optim.Point) {
 	if p.Val < m.Curr.Val {
 		m.Curr = p
 	}
@@ -104,7 +104,7 @@ func (m *Method) AddPoint(p optim.Point) {
 
 // Iterate mutates m and so for each iteration, the same, mutated m should be
 // passed in.
-func (m *Method) Iterate(o optim.Objectiver, mesh optim.Mesh) (best optim.Point, n int, err error) {
+func (m *Method) Iterate(o optim.Objectiver, mesh optim.Mesh) (best *optim.Point, n int, err error) {
 	var nevalsearch, nevalpoll int
 	var success bool
 	defer m.updateDb(&nevalsearch, &nevalpoll, mesh.Step())
@@ -131,7 +131,7 @@ func (m *Method) Iterate(o optim.Objectiver, mesh optim.Mesh) (best optim.Point,
 	// current mesh grid.  This doesn't need to happen if search succeeds
 	// because search either always operates on the same grid, or always
 	// operates in continuous space.
-	mesh.SetOrigin(m.Curr.Pos()) // TODO: test that this doesn't get set to Zero pos [0 0 0...] on first iteration.
+	mesh.SetOrigin(m.Curr.Pos) // TODO: test that this doesn't get set to Zero pos [0 0 0...] on first iteration.
 
 	success, best, nevalpoll, err = m.Poller.Poll(o, m.ev, mesh, m.Curr)
 	n += nevalpoll
@@ -148,7 +148,7 @@ func (m *Method) Iterate(o optim.Objectiver, mesh optim.Mesh) (best optim.Point,
 		// Important to recenter mesh on new best point.  More particularly,
 		// the mesh may have been resized and the new best may not lie on the
 		// previous mesh grid.
-		mesh.SetOrigin(best.Pos())
+		mesh.SetOrigin(best.Pos)
 
 		return best, n, nil
 	} else {
@@ -187,7 +187,7 @@ func (m *Method) initdb() {
 
 func (m Method) xdbsql(op string) string {
 	s := ""
-	for i := range m.Curr.Pos() {
+	for i := range m.Curr.Pos {
 		if op == "?" {
 			s += ",?"
 		} else if op == "define" {
@@ -215,7 +215,7 @@ func (m Method) updateDb(nsearch, npoll *int, step float64) {
 	s1 := "INSERT INTO " + TblPolls + " (iter,val" + m.xdbsql("x") + ") VALUES (?,?" + m.xdbsql("?") + ");"
 	for _, p := range m.Poller.Points() {
 		args := []interface{}{m.count, p.Val}
-		args = append(args, pos2iface(p.Pos())...)
+		args = append(args, pos2iface(p.Pos)...)
 		_, err := tx.Exec(s1, args...)
 		if checkdberr(err) {
 			return
@@ -225,7 +225,7 @@ func (m Method) updateDb(nsearch, npoll *int, step float64) {
 	s2 := "INSERT INTO " + TblInfo + " (iter,step,nsearch, npoll,val" + m.xdbsql("x") + ") VALUES (?,?,?,?,?" + m.xdbsql("?") + ");"
 	glob := m.Curr
 	args := []interface{}{m.count, step, *nsearch, *npoll, glob.Val}
-	args = append(args, pos2iface(glob.Pos())...)
+	args = append(args, pos2iface(glob.Pos)...)
 	_, err = tx.Exec(s2, args...)
 	if checkdberr(err) {
 		return
@@ -243,12 +243,12 @@ type Poller struct {
 	SkipEps    float64
 	SpanFn     SpanFunc
 	keepdirecs []direc
-	points     []optim.Point
+	points     []*optim.Point
 	prevhash   [sha1.Size]byte
 	prevstep   float64
 }
 
-func (cp *Poller) Points() []optim.Point { return cp.points }
+func (cp *Poller) Points() []*optim.Point { return cp.points }
 
 type direc struct {
 	dir []int
@@ -268,10 +268,10 @@ func (b byval) Swap(i, j int)      { b[i], b[j] = b[j], b[i] }
 // evaluations.  If a better point was not found, it returns false, the
 // from point, and the number of evaluations.  If err is non-nil, success
 // must be false and best must be from - neval may be non-zero.
-func (cp *Poller) Poll(obj optim.Objectiver, ev optim.Evaler, m optim.Mesh, from optim.Point) (success bool, best optim.Point, neval int, err error) {
+func (cp *Poller) Poll(obj optim.Objectiver, ev optim.Evaler, m optim.Mesh, from *optim.Point) (success bool, best *optim.Point, neval int, err error) {
 	best = from
 
-	pollpoints := []optim.Point{}
+	pollpoints := []*optim.Point{}
 
 	// Only poll compass directions if we haven't polled from this point
 	// before.  DONT DELETE - this can fire sometimes if the mesh isn't
@@ -296,14 +296,14 @@ func (cp *Poller) Poll(obj optim.Objectiver, ev optim.Evaler, m optim.Mesh, from
 	// Add successful directions from last poll.  We want to add these points
 	// in front of the other points so we can potentially stop earlier if
 	// polling opportunistically.
-	prevgood := make([]optim.Point, len(cp.keepdirecs))
+	prevgood := make([]*optim.Point, len(cp.keepdirecs))
 	for i, dir := range cp.keepdirecs {
 		prevgood[i] = pointFromDirec(from, dir.dir, m)
 	}
 	pollpoints = append(prevgood, pollpoints...)
 	//pollpoints = append(pollpoints, prevgood...)
 
-	cp.points = make([]optim.Point, 0, len(pollpoints))
+	cp.points = make([]*optim.Point, 0, len(pollpoints))
 	if cp.SkipEps == 0 {
 		cp.points = pollpoints
 	} else {
@@ -353,12 +353,12 @@ func (cp *Poller) Poll(obj optim.Objectiver, ev optim.Evaler, m optim.Mesh, from
 }
 
 type Searcher interface {
-	Search(o optim.Objectiver, m optim.Mesh, curr optim.Point) (success bool, best optim.Point, n int, err error)
+	Search(o optim.Objectiver, m optim.Mesh, curr *optim.Point) (success bool, best *optim.Point, n int, err error)
 }
 
 type NullSearcher struct{}
 
-func (_ NullSearcher) Search(o optim.Objectiver, m optim.Mesh, curr optim.Point) (success bool, best optim.Point, n int, err error) {
+func (_ NullSearcher) Search(o optim.Objectiver, m optim.Mesh, curr *optim.Point) (success bool, best *optim.Point, n int, err error) {
 	return false, curr, 0, nil // TODO: test that this returns curr instead of something else
 }
 
@@ -369,13 +369,13 @@ type WrapSearcher struct {
 	Share bool
 }
 
-func (s *WrapSearcher) Search(o optim.Objectiver, m optim.Mesh, curr optim.Point) (success bool, best optim.Point, n int, err error) {
+func (s *WrapSearcher) Search(o optim.Objectiver, m optim.Mesh, curr *optim.Point) (success bool, best *optim.Point, n int, err error) {
 	if s.Share {
 		s.Method.AddPoint(curr)
 	}
 	best, n, err = s.Method.Iterate(o, m)
 	if err != nil {
-		return false, optim.Point{}, n, err
+		return false, &optim.Point{Val: math.Inf(1)}, n, err
 	}
 	if best.Val < curr.Val {
 		return true, best, n, nil
@@ -403,24 +403,24 @@ func (s *objStopper) Objective(v []float64) (float64, error) {
 	return obj, nil
 }
 
-func genPollPoints(from optim.Point, span SpanFunc, m optim.Mesh) []optim.Point {
+func genPollPoints(from *optim.Point, span SpanFunc, m optim.Mesh) []*optim.Point {
 	ndim := from.Len()
 	dirs := span(ndim)
-	polls := make([]optim.Point, 0, len(dirs))
+	polls := make([]*optim.Point, 0, len(dirs))
 	for _, d := range dirs {
 		polls = append(polls, pointFromDirec(from, d, m))
 	}
 	return polls
 }
 
-func pointFromDirec(from optim.Point, direc []int, m optim.Mesh) optim.Point {
+func pointFromDirec(from *optim.Point, direc []int, m optim.Mesh) *optim.Point {
 	pos := make([]float64, from.Len())
 	step := m.Step()
-	for i := range pos {
-		pos[i] = from.At(i) + float64(direc[i])*step
+	for i, x0 := range from.Pos {
+		pos[i] = x0 + float64(direc[i])*step
 
 	}
-	return optim.NewPoint(m.Nearest(pos), math.Inf(1))
+	return &optim.Point{m.Nearest(pos), math.Inf(1)}
 }
 
 // SpanFunc is returns a set of poll directions (maybe positive spanning set?)
@@ -512,11 +512,11 @@ func pos2iface(pos []float64) []interface{} {
 	return iface
 }
 
-func direcbetween(from, to optim.Point, m optim.Mesh) []int {
+func direcbetween(from, to *optim.Point, m optim.Mesh) []int {
 	d := make([]int, from.Len())
 	step := m.Step()
-	for i := 0; i < from.Len(); i++ {
-		d[i] = int((to.At(i) - from.At(i)) / step)
+	for i, x0 := range from.Pos {
+		d[i] = int((to.Pos[i] - x0) / step)
 	}
 	return d
 }

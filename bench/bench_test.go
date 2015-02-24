@@ -175,7 +175,7 @@ func patternsolver(fn bench.Func, db *sql.DB) (*pattern.Method, optim.Mesh) {
 	max, min := up[0], low[0]
 	mesh := &optim.InfMesh{StepSize: (max - min) / 10}
 	p := initialpoint(fn)
-	mesh.SetOrigin(p.Pos())
+	mesh.SetOrigin(p.Pos)
 	return pattern.New(p, pattern.DB(db)), mesh
 }
 
@@ -201,7 +201,7 @@ func pswarmsolver(fn bench.Func, db *sql.DB, n int) (*pattern.Method, optim.Mesh
 	max, min := up[0], low[0]
 	mesh := &optim.InfMesh{StepSize: (max - min) / 10}
 	p := initialpoint(fn)
-	mesh.SetOrigin(p.Pos())
+	mesh.SetOrigin(p.Pos)
 
 	return pattern.New(p,
 		pattern.SearchMethod(swarmsolver(fn, db, n), pattern.Share),
@@ -209,12 +209,12 @@ func pswarmsolver(fn bench.Func, db *sql.DB, n int) (*pattern.Method, optim.Mesh
 	), mesh
 }
 
-func initialpoint(fn bench.Func) optim.Point {
+func initialpoint(fn bench.Func) *optim.Point {
 	low, up := fn.Bounds()
 	max, min := up[0], low[0]
 	pos := make([]float64, len(low))
 	for i := range low {
 		pos[i] = rand.Float64()*(max-min) + min
 	}
-	return optim.NewPoint(pos, math.Inf(1))
+	return &optim.Point{pos, math.Inf(1)}
 }

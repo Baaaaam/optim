@@ -114,7 +114,7 @@ func (p *Particle) Kill(gbest *optim.Point, xtol, vtol float64) bool {
 	diffx := 0.0
 	for i, v := range p.Vel {
 		totv += v * v
-		diff := p.At(i) - gbest.At(i)
+		diff := p.Pos[i] - gbest.Pos[i]
 		diffx += diff * diff
 	}
 	return (totv < vtol*vtol) && (diffx < xtol*xtol)
@@ -308,7 +308,7 @@ func (m *Method) Iterate(obj optim.Objectiver, mesh optim.Mesh) (best *optim.Poi
 	points := m.Pop.Points()
 	if mesh != nil {
 		for i, p := range points {
-			points[i] = optim.Nearest(p, mesh)
+			points[i] = &optim.Point{mesh.Nearest(p.Pos), math.Inf(1)}
 		}
 	}
 
@@ -407,21 +407,21 @@ func (m *Method) updateDb(mesh optim.Mesh) {
 	s1 := "INSERT INTO " + TblParticlesBest + " (particle,iter,best" + m.xdbsql("x") + ") VALUES (?,?,?" + m.xdbsql("?") + ");"
 	for _, p := range m.Pop {
 		args := []interface{}{p.Id, m.count, p.Val}
-		args = append(args, pos2iface(p.Pos())...)
+		args = append(args, pos2iface(p.Pos)...)
 		_, err := tx.Exec(s0, args...)
 		if checkdberr(err) {
 			return
 		}
 
 		args = []interface{}{p.Id, m.count, p.Best.Val}
-		args = append(args, pos2iface(p.Best.Pos())...)
+		args = append(args, pos2iface(p.Best.Pos)...)
 		_, err = tx.Exec(s1, args...)
 		if checkdberr(err) {
 			return
 		}
 
 		args = []interface{}{p.Id, m.count, p.Val}
-		args = append(args, pos2iface(mesh.Nearest(p.Pos()))...)
+		args = append(args, pos2iface(mesh.Nearest(p.Pos))...)
 		_, err = tx.Exec(s0b, args...)
 		if checkdberr(err) {
 			return
@@ -431,7 +431,7 @@ func (m *Method) updateDb(mesh optim.Mesh) {
 	s2 := "INSERT INTO " + TblBest + " (iter,val" + m.xdbsql("x") + ") VALUES (?,?" + m.xdbsql("?") + ");"
 	glob := m.best
 	args := []interface{}{m.count, glob.Val}
-	args = append(args, pos2iface(glob.Pos())...)
+	args = append(args, pos2iface(glob.Pos)...)
 	_, err = tx.Exec(s2, args...)
 	if checkdberr(err) {
 		return
@@ -440,7 +440,7 @@ func (m *Method) updateDb(mesh optim.Mesh) {
 
 func (m *Method) xdbsql(op string) string {
 	s := ""
-	for i := range m.Pop[0].Pos() {
+	for i := range m.Pop[0].Pos {
 		if op == "?" {
 			s += ",?"
 		} else if op == "define" {

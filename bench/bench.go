@@ -38,7 +38,7 @@ var Basic = []Func{
 type Func interface {
 	Eval(v []float64) float64
 	Bounds() (low, up []float64)
-	Optima() []optim.Point
+	Optima() []*optim.Point
 	// Tol returns a value below which the Func is considered
 	// optimized/solved.
 	Tol() float64
@@ -67,9 +67,9 @@ func (fn Ackley) Bounds() (low, up []float64) {
 	return []float64{-5, -5}, []float64{5, 5}
 }
 
-func (fn Ackley) Optima() []optim.Point {
-	return []optim.Point{
-		optim.NewPoint([]float64{0, 0}, 0),
+func (fn Ackley) Optima() []*optim.Point {
+	return []*optim.Point{
+		&optim.Point{[]float64{0, 0}, 0},
 	}
 }
 
@@ -93,12 +93,12 @@ func (fn CrossTray) Bounds() (low, up []float64) {
 	return []float64{-10, -10}, []float64{10, 10}
 }
 
-func (fn CrossTray) Optima() []optim.Point {
-	return []optim.Point{
-		optim.NewPoint([]float64{1.34941, -1.34941}, -2.06261),
-		optim.NewPoint([]float64{1.34941, 1.34941}, -2.06261),
-		optim.NewPoint([]float64{-1.34941, 1.34941}, -2.06261),
-		optim.NewPoint([]float64{-1.34941, -1.34941}, -2.06261),
+func (fn CrossTray) Optima() []*optim.Point {
+	return []*optim.Point{
+		&optim.Point{[]float64{1.34941, -1.34941}, -2.06261},
+		&optim.Point{[]float64{1.34941, 1.34941}, -2.06261},
+		&optim.Point{[]float64{-1.34941, 1.34941}, -2.06261},
+		&optim.Point{[]float64{-1.34941, -1.34941}, -2.06261},
 	}
 }
 
@@ -122,9 +122,9 @@ func (fn Eggholder) Bounds() (low, up []float64) {
 	return []float64{-512, -512}, []float64{512, 512}
 }
 
-func (fn Eggholder) Optima() []optim.Point {
-	return []optim.Point{
-		optim.NewPoint([]float64{512, 404.2319}, -959.6407),
+func (fn Eggholder) Optima() []*optim.Point {
+	return []*optim.Point{
+		&optim.Point{[]float64{512, 404.2319}, -959.6407},
 	}
 }
 
@@ -148,12 +148,12 @@ func (fn HolderTable) Bounds() (low, up []float64) {
 	return []float64{-10, -10}, []float64{10, 10}
 }
 
-func (fn HolderTable) Optima() []optim.Point {
-	return []optim.Point{
-		optim.NewPoint([]float64{8.05502, 9.66459}, -19.2085),
-		optim.NewPoint([]float64{-8.05502, 9.66459}, -19.2085),
-		optim.NewPoint([]float64{8.05502, -9.66459}, -19.2085),
-		optim.NewPoint([]float64{-8.05502, -9.66459}, -19.2085),
+func (fn HolderTable) Optima() []*optim.Point {
+	return []*optim.Point{
+		&optim.Point{[]float64{8.05502, 9.66459}, -19.2085},
+		&optim.Point{[]float64{-8.05502, 9.66459}, -19.2085},
+		&optim.Point{[]float64{8.05502, -9.66459}, -19.2085},
+		&optim.Point{[]float64{-8.05502, -9.66459}, -19.2085},
 	}
 }
 
@@ -177,9 +177,9 @@ func (fn Schaffer2) Bounds() (low, up []float64) {
 	return []float64{-100, -100}, []float64{100, 100}
 }
 
-func (fn Schaffer2) Optima() []optim.Point {
-	return []optim.Point{
-		optim.NewPoint([]float64{0, 0}, 0),
+func (fn Schaffer2) Optima() []*optim.Point {
+	return []*optim.Point{
+		&optim.Point{[]float64{0, 0}, 0},
 	}
 }
 
@@ -213,13 +213,13 @@ func (fn Styblinski) Bounds() (low, up []float64) {
 	return low, up
 }
 
-func (fn Styblinski) Optima() []optim.Point {
+func (fn Styblinski) Optima() []*optim.Point {
 	pos := make([]float64, fn.NDim)
 	for i := range pos {
 		pos[i] = -2.903534
 	}
-	return []optim.Point{
-		optim.NewPoint(pos, -39.16599*float64(fn.NDim)),
+	return []*optim.Point{
+		&optim.Point{pos, -39.16599 * float64(fn.NDim)},
 	}
 }
 
@@ -253,9 +253,9 @@ func (fn Rastrigrin) Bounds() (low, up []float64) {
 	return low, up
 }
 
-func (fn Rastrigrin) Optima() []optim.Point {
-	return []optim.Point{
-		optim.NewPoint(make([]float64, fn.NDim), 0),
+func (fn Rastrigrin) Optima() []*optim.Point {
+	return []*optim.Point{
+		&optim.Point{make([]float64, fn.NDim), 0},
 	}
 }
 
@@ -291,9 +291,9 @@ func (fn Griewank) Bounds() (low, up []float64) {
 	return low, up
 }
 
-func (fn Griewank) Optima() []optim.Point {
-	return []optim.Point{
-		optim.NewPoint(make([]float64, fn.NDim), 0),
+func (fn Griewank) Optima() []*optim.Point {
+	return []*optim.Point{
+		&optim.Point{make([]float64, fn.NDim), 0},
 	}
 }
 
@@ -330,13 +330,13 @@ func (fn Rosenbrock) Bounds() (low, up []float64) {
 	return low, up
 }
 
-func (fn Rosenbrock) Optima() []optim.Point {
+func (fn Rosenbrock) Optima() []*optim.Point {
 	pos := make([]float64, fn.NDim)
 	for i := range pos {
 		pos[i] = 1
 	}
-	return []optim.Point{
-		optim.NewPoint(pos, 0),
+	return []*optim.Point{
+		&optim.Point{pos, 0},
 	}
 }
 

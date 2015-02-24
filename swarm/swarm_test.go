@@ -104,7 +104,7 @@ func TestPopulation_Points(t *testing.T) {
 	pop[0].Val = want
 	points := pop.Points()
 	points[0].Val = 7
-	points[0] = optim.NewPoint([]float64{0}, 13)
+	points[0] = &optim.Point{[]float64{0}, 13}
 	got := pop[0].Val
 
 	if got != want {
@@ -165,20 +165,19 @@ func TestParticle_Move(t *testing.T) {
 
 	// initialize and execute
 	p := &Particle{
-		Point: optim.NewPoint(x0, 42),
+		Point: &optim.Point{x0, 42},
 		Vel:   v0,
-		Best:  optim.NewPoint(xbest, 41),
+		Best:  &optim.Point{xbest, 41},
 	}
-	glob := optim.NewPoint(globest, 41)
+	glob := &optim.Point{globest, 41}
 
 	p.Move(glob, vmax, DefaultInertia, DefaultSocial, DefaultCognition)
 
 	// test
 	vel := p.Vel
-	pos := p.Pos()
-	for i := range pos {
-		if math.Abs(pos[i]-wantpos[i]) > 1e-10 {
-			t.Errorf("pos[%v]: want %v, got %v", i, wantpos[i], pos[i])
+	for i := range p.Pos {
+		if math.Abs(p.Pos[i]-wantpos[i]) > 1e-10 {
+			t.Errorf("pos[%v]: want %v, got %v", i, wantpos[i], p.Pos[i])
 		}
 		if math.Abs(vel[i]-wantvel[i]) > 1e-10 {
 			t.Errorf("vel[%v]: want %v, got %v", i, wantvel[i], vel[i])
