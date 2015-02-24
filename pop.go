@@ -29,7 +29,13 @@ func RandPop(n int, low, up []float64) []*Point {
 
 // RandPopConstr generates a random population of n feasible points satisfying
 // the linear constraints "low <= Ax <= up". lb and ub define lower and upper
-// box bounds for the variables.
+// box bounds for the variables.  Points are generated in the range
+// 2*(ub[i]-lb[i]) centered around the box bounds - twice the range of the box
+// bounds in each dimension. Infeasible/out-of-box points are projected to the
+// nearest positions on the feasible region.  This allows problems with a
+// relatively small feasible region within the box bounds to have points
+// distributed around the entire outer surface (all sides) of the feasible
+// region.
 func RandPopConstr(n int, lb, ub []float64, low, A, up *mat64.Dense) []*Point {
 	stackA, b, _ := StackConstrBoxed(lb, ub, low, A, up)
 	_, ndims := A.Dims()
