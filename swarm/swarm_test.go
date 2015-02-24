@@ -86,33 +86,6 @@ func TestNewPopulationRand(t *testing.T) {
 	}
 }
 
-func TestPopulation_Points(t *testing.T) {
-	l, u := -5.0, 5.0
-	ndim := 2
-	n := 100
-
-	low := []float64{}
-	up := []float64{}
-	for i := 0; i < ndim; i++ {
-		low = append(low, l)
-		up = append(up, u)
-	}
-
-	pop := NewPopulationRand(n, low, up)
-
-	want := 42.0
-	pop[0].Val = want
-	points := pop.Points()
-	points[0].Val = 7
-	points[0] = &optim.Point{[]float64{0}, 13}
-	got := pop[0].Val
-
-	if got != want {
-		t.Errorf("a modification to a returned point modified the original particle:")
-		t.Errorf("    want %v, got %v", want, got)
-	}
-}
-
 func TestPopulation_Best(t *testing.T) {
 	l, u := -5.0, 5.0
 	ndim := 2
@@ -132,7 +105,7 @@ func TestPopulation_Best(t *testing.T) {
 	pop[4].Val = want
 	best := pop.Best()
 	if best.Val == want {
-		t.Errorf("Best method uses the particles current value instead of the particles best value.")
+		t.Errorf("Best method uses the particle's current value instead of the particles best value.")
 	}
 
 	pop[4].Best.Val = want

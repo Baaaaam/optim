@@ -114,12 +114,14 @@ type Method interface {
 }
 
 type Evaler interface {
-	// Eval evaluates each point using obj and returns the resulting points
-	// with corresponding objective values. It also returns the number of
-	// times obj was called n and any error that occurred.  Unevaluated points
-	// should not be returned in the results slice.  The order of points in
-	// results may be different than the order of the passed in points.
-	// len(results) may be less than len(points).
+	// Eval evaluates each point using obj and sets its value.  It also
+	// returns the resulting points with corresponding objective values. It
+	// also returns the number of times obj was called n and any error that
+	// occurred.  Unevaluated points should not be returned in the results
+	// slice.  The order of points in results may be different than the order
+	// of the passed in points.  len(results) may be less than len(points).
+	// Note that it is not strictly necessary to use the results as the passed
+	// in pointers will be modified also.
 	Eval(obj Objectiver, points ...*Point) (results []*Point, n int, err error)
 }
 

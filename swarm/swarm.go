@@ -98,11 +98,10 @@ func (p *Particle) Move(gbest *optim.Point, vmax []float64, inertia, social, cog
 	}
 
 	// update position
-	pos := make([]float64, p.Len())
-	for i := range pos {
-		pos[i] = p.Pos[i] + p.Vel[i]
+	for i := range p.Pos {
+		p.Pos[i] += p.Vel[i]
 	}
-	p.Point = &optim.Point{pos, math.Inf(1)}
+	p.Val = math.Inf(1)
 }
 
 func (p *Particle) Kill(gbest *optim.Point, xtol, vtol float64) bool {
@@ -125,7 +124,7 @@ func (p *Particle) Update(newp *optim.Point) {
 	// projected onto a mesh and be different.
 	p.Val = newp.Val
 	if p.Val < p.Best.Val {
-		p.Best = newp
+		p.Best = newp.Clone()
 	}
 }
 
@@ -141,7 +140,7 @@ func NewPopulation(points []*optim.Point, vmax []float64) Population {
 		pop[i] = &Particle{
 			Id:    i,
 			Point: p,
-			Best:  p,
+			Best:  p.Clone(),
 			Vel:   make([]float64, len(vmax)),
 		}
 		for j, v := range vmax {
@@ -156,14 +155,6 @@ func NewPopulation(points []*optim.Point, vmax []float64) Population {
 func NewPopulationRand(n int, low, up []float64) Population {
 	points := optim.RandPop(n, low, up)
 	return NewPopulation(points, vmaxfrombounds(low, up))
-}
-
-func (pop Population) Points() []*optim.Point {
-	points := make([]*optim.Point, 0, len(pop))
-	for _, p := range pop {
-		points = append(points, p.Point)
-	}
-	return points
 }
 
 func (pop Population) Best() *Particle {
@@ -290,7 +281,7 @@ func New(pop Population, opts ...Option) *Method {
 		Social:    DefaultSocial,
 		InertiaFn: func(iter int) float64 { return DefaultInertia },
 		Vmax:      vmax,
-		best:      pop.Best().Point,
+		best:      pop.Best().Point.Clone(), // TODO: write test that checks best is a Clone
 	}
 
 	for _, opt := range opts {
@@ -305,10 +296,17 @@ func (m *Method) Iterate(obj optim.Objectiver, mesh optim.Mesh) (best *optim.Poi
 	m.count++
 
 	// project positions onto mesh
-	points := m.Pop.Points()
+	pmap := make(map[*optim.Point]*Particle, len(m.Pop))
+	points := make([]*optim.Point, len(m.Pop))
+	for i, particle := range m.Pop {
+		p := particle.Point.Clone()
+		p.Val = math.Inf(1)
+		points[i] = p
+		pmap[p] = particle
+	}
 	if mesh != nil {
-		for i, p := range points {
-			points[i] = &optim.Point{mesh.Nearest(p.Pos), math.Inf(1)}
+		for _, p := range points {
+			p.Pos = mesh.Nearest(p.Pos)
 		}
 	}
 
@@ -317,8 +315,8 @@ func (m *Method) Iterate(obj optim.Objectiver, mesh optim.Mesh) (best *optim.Poi
 	if err != nil {
 		return &optim.Point{Val: math.Inf(1)}, n, err
 	}
-	for i := range results {
-		m.Pop[i].Update(results[i])
+	for _, p := range results {
+		pmap[p].Update(p)
 	}
 	m.updateDb(mesh)
 

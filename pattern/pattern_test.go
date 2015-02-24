@@ -2,6 +2,8 @@ package pattern
 
 import (
 	"database/sql"
+	"log"
+	"math"
 	"testing"
 
 	_ "github.com/mxk/go-sqlite/sqlite3"
@@ -27,32 +29,39 @@ func TestDb(t *testing.T) {
 		MaxIter: 100,
 		MinStep: -1,
 	}
-	solv.Run()
+	err = solv.Run()
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	t.Logf("[INFO] %v evals: want %v, got %v", solv.Neval(), optimum, solv.Best().Val)
 
 	var count int
 	err = db.QueryRow("SELECT COUNT(*) FROM " + TblPolls).Scan(&count)
 	if err != nil {
-		t.Errorf("[ERROR] particles table query failed: %v", err)
+		t.Errorf("[ERROR] polls table query failed: %v", err)
 	} else if count == 0 {
-		t.Errorf("[ERROR] particles table has no rows")
+		t.Errorf("[ERROR] polls table has no rows")
 	}
 
 	count = 0
 	err = db.QueryRow("SELECT COUNT(*) FROM " + TblInfo).Scan(&count)
 	if err != nil {
-		t.Errorf("[ERROR] best table query failed: %v", err)
+		t.Errorf("[ERROR] info table query failed: %v", err)
 	} else if count == 0 {
-		t.Errorf("[ERROR] best table has no rows")
+		t.Errorf("[ERROR] info table has no rows")
 	}
 }
 
 func patternsolver(fn bench.Func, db *sql.DB) (optim.Method, optim.Mesh) {
 	low, up := fn.Bounds()
 	max, min := up[0], low[0]
+	pos := make([]float64, len(low))
+	for i := range pos {
+		pos[i] = low[i] + (up[i]-low[i])/3
+	}
 	m := &optim.BoxMesh{&optim.InfMesh{StepSize: (max - min) / 10}, low, up}
-	p := optim.NewPoint(m.Origin(), 0)
-	it := New(p, DB(db))
-	return it, m
+	m.SetOrigin(pos)
+	p := &optim.Point{pos, math.Inf(1)}
+	return New(p, DB(db)), m
 }
