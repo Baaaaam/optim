@@ -1,6 +1,7 @@
 package optim
 
 import (
+	"fmt"
 	"math"
 
 	"github.com/gonum/matrix/mat64"
@@ -20,14 +21,18 @@ import (
 func OrthoProj(x0 []float64, A, b *mat64.Dense) ([]float64, error) {
 	x := mat64.NewDense(len(x0), 1, x0)
 
+	fmt.Println("ortho spot1")
+
 	m, n := A.Dims()
 	if m >= n {
+		fmt.Println("ortho spot1b")
 		proj, err := mat64.Solve(A, b)
 		if err != nil {
 			return nil, err
 		}
 		return proj.Col(nil, 0), nil
 	}
+	fmt.Println("ortho spot2")
 
 	Atrans := &mat64.Dense{}
 	Atrans.TCopy(A)
@@ -35,24 +40,37 @@ func OrthoProj(x0 []float64, A, b *mat64.Dense) ([]float64, error) {
 	AAtrans := &mat64.Dense{}
 	AAtrans.Mul(A, Atrans)
 
+	fmt.Println("ortho spot3")
+
 	// B = A^T * (A*A^T)^-1
 	B := &mat64.Dense{}
 	inv, err := mat64.Inverse(AAtrans)
 	if err != nil {
 		return nil, err
 	}
+	fmt.Println("ortho spot3b")
 	B.Mul(Atrans, inv)
 
-	n, _ = B.Dims()
+	fmt.Println("ortho spot4")
 
-	tmp := &mat64.Dense{}
+	n, _ = B.Dims()
+	_, j := A.Dims()
+
+	tmp := mat64.NewDense(n, j, nil)
+	fmt.Println("ortho spot4b")
 	tmp.Mul(B, A)
+	fmt.Println("ortho spot4c")
 	tmp.Sub(eye(n), tmp)
+	fmt.Println("ortho spot4d")
 	tmp.Mul(tmp, x)
+
+	fmt.Println("ortho spot5")
 
 	tmp2 := &mat64.Dense{}
 	tmp2.Mul(B, b)
 	tmp.Add(tmp, tmp2)
+
+	fmt.Println("ortho spot6")
 
 	return tmp.Col(nil, 0), nil
 }
@@ -89,6 +107,9 @@ func Project(x0 []float64, A, b *mat64.Dense) (proj []float64, success bool) {
 				badb.Stack(tmpb, bviol)
 			}
 		}
+
+		r, c := badA.Dims()
+		fmt.Println("badA.Dims:", r, c)
 
 		newproj, err := OrthoProj(from, badA, badb)
 		if err != nil {
@@ -128,6 +149,7 @@ func mostviolated(x0 []float64, A, b *mat64.Dense) (Aviol, bviol *mat64.Dense) {
 			}
 		}
 	}
+	fmt.Println("farthest:", farthest)
 	if worstRow == -1 {
 		return nil, nil
 	}
