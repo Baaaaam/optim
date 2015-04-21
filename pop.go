@@ -41,18 +41,34 @@ func RandPopConstr(n int, lb, ub []float64, low, A, up *mat64.Dense) []*Point {
 	stackA, b, _ := StackConstrBoxed(lb, ub, low, A, up)
 	_, ndims := A.Dims()
 
-	points := make([]*Point, 0, n)
-	for i := 0; i < n; i++ {
-		fmt.Println("generating point ", i)
-		pos := make([]float64, ndims)
-		for j := range pos {
-			l, u := lb[j], ub[j]
-			pos[j] = l + RandFloat()*2*(u-l) - (u-l)/2
+	in := make(chan []float64)
+	ch := make(chan *Point)
+	defer close(in)
+	go func() {
+		for i := 0; i < n; i++ {
+			pos := make([]float64, ndims)
+			for j := range pos {
+				l, u := lb[j], ub[j]
+				pos[j] = l + RandFloat()*2*(u-l) - (u-l)/2
+			}
+			in <- pos
 		}
+	}()
 
-		// project onto feasible region
-		proj, _ := Project(pos, stackA, b)
-		points = append(points, &Point{proj, math.Inf(1)})
+	for i := 0; i < 4; i++ {
+		go func() {
+			for pos := range in {
+				// project onto feasible region
+				proj, _ := Project(pos, stackA, b)
+				ch <- &Point{proj, math.Inf(1)}
+			}
+		}()
+	}
+
+	points := make([]*Point, n)
+	for i := range points {
+		fmt.Println("generated point ", i)
+		points[i] = <-ch
 	}
 
 	return points
