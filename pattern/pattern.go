@@ -55,7 +55,13 @@ func PollNp1(m *Method) { m.Poller.SpanFn = CompassNp1 }
 
 // PollRandN sets the method to poll in n random directions setting the
 // direction for a randomly chosen number of dimensions to +/- step size.
-func PollRandN(n int) Option { return func(m *Method) { m.Poller.SpanFn = RandomN(n) } }
+func PollRandN(n int) Option {
+	return func(m *Method) {
+		if n > 0 {
+			m.Poller.SpanFn = RandomN(n)
+		}
+	}
+}
 
 func DB(db *sql.DB) Option {
 	return func(m *Method) {
@@ -282,7 +288,6 @@ func (cp *Poller) Poll(obj optim.Objectiver, ev optim.Evaler, m optim.Mesh, from
 		} else {
 			pollpoints = append(pollpoints, genPollPoints(from, cp.SpanFn, m)...)
 		}
-		pollpoints = append(pollpoints, genPollPoints(from, RandomN(from.Len()), m)...)
 		cp.prevhash = h
 	} else {
 		// Use random directions instead.

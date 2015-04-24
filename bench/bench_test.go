@@ -47,13 +47,15 @@ func TestBenchPSwarmRosen(t *testing.T) {
 	ndim := 30
 	npar := 30
 	maxiter := 10000
-	successfrac := 1.00
+	successfrac := 1.0
 	avgiter := 400.0
 
 	fn := bench.Rosenbrock{ndim}
 	sfn := func() *optim.Solver {
 		m, mesh := pswarmsolver(fn, nil, npar)
-		m.Poller = &pattern.Poller{SpanFn: pattern.CompassNp1}
+		low, _ := fn.Bounds()
+		ndim := len(low)
+		m.Poller = &pattern.Poller{SpanFn: pattern.RandomN(2 * ndim)}
 		return &optim.Solver{
 			Method:  m,
 			Obj:     optim.Func(fn.Eval),
