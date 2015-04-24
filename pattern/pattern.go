@@ -68,8 +68,11 @@ func SkipEps(eps float64) Option { return func(m *Method) { m.Poller.SkipEps = e
 
 func Nkeep(n int) Option { return func(m *Method) { m.Poller.Nkeep = n } }
 
+func ResetStep(threshold float64) Option {
+	return func(m *Method) { m.ResetStep = threshold }
+}
+
 type Method struct {
-	ev             optim.Evaler
 	Poller         *Poller
 	Searcher       Searcher
 	Curr           *optim.Point
@@ -77,7 +80,14 @@ type Method struct {
 	NsuccessGrow   int  // number of successive successful polls before growing mesh
 	nsuccess       int  // (internal) number of successive successful polls
 	Db             *sql.DB
-	count          int
+	// ResetStep is a step size threshold below which the mesh step is reset
+	// to its original starting value.  This can be useful for problems where
+	// the significance of a particular step size of one variable may be a
+	// function of the value other variables.
+	ResetStep float64
+	origstep  float64
+	count     int
+	ev        optim.Evaler
 }
 
 func New(start *optim.Point, opts ...Option) *Method {
@@ -105,6 +115,12 @@ func (m *Method) AddPoint(p *optim.Point) {
 // Iterate mutates m and so for each iteration, the same, mutated m should be
 // passed in.
 func (m *Method) Iterate(o optim.Objectiver, mesh optim.Mesh) (best *optim.Point, n int, err error) {
+	if m.count == 0 {
+		m.origstep = mesh.Step()
+	} else if mesh.Step() < m.ResetStep {
+		mesh.SetStep(m.origstep)
+	}
+
 	var nevalsearch, nevalpoll int
 	var success bool
 	defer m.updateDb(&nevalsearch, &nevalpoll, mesh.Step())
