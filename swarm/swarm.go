@@ -17,7 +17,6 @@ package swarm
 
 import (
 	"database/sql"
-	"fmt"
 	"log"
 	"math"
 
@@ -353,36 +352,25 @@ func (m *Method) initdb() {
 		return
 	}
 
-	s := "CREATE TABLE IF NOT EXISTS " + TblParticles + " (particle INTEGER, iter INTEGER, val REAL"
-	s += m.xdbsql("define")
-	s += ");"
-
+	s := "CREATE TABLE IF NOT EXISTS " + TblParticles + " (particle INTEGER, iter INTEGER, val REAL, posid BLOB);"
 	_, err := m.Db.Exec(s)
 	if checkdberr(err) {
 		return
 	}
 
-	s = "CREATE TABLE IF NOT EXISTS " + TblParticlesMeshed + " (particle INTEGER, iter INTEGER, val REAL"
-	s += m.xdbsql("define")
-	s += ");"
-
+	s = "CREATE TABLE IF NOT EXISTS " + TblParticlesMeshed + " (particle INTEGER, iter INTEGER, val REAL, posid BLOB);"
 	_, err = m.Db.Exec(s)
 	if checkdberr(err) {
 		return
 	}
 
-	s = "CREATE TABLE IF NOT EXISTS " + TblParticlesBest + " (particle INTEGER, iter INTEGER, best REAL"
-	s += m.xdbsql("define")
-	s += ");"
-
+	s = "CREATE TABLE IF NOT EXISTS " + TblParticlesBest + " (particle INTEGER, iter INTEGER, best REAL, posid BLOB);"
 	_, err = m.Db.Exec(s)
 	if checkdberr(err) {
 		return
 	}
 
-	s = "CREATE TABLE IF NOT EXISTS " + TblBest + " (iter INTEGER, val REAL"
-	s += m.xdbsql("define")
-	s += ");"
+	s = "CREATE TABLE IF NOT EXISTS " + TblBest + " (iter INTEGER, val REAL, posid BLOB);"
 	_, err = m.Db.Exec(s)
 	if checkdberr(err) {
 		return
@@ -400,64 +388,53 @@ func (m *Method) updateDb(mesh optim.Mesh) {
 	}
 	defer tx.Commit()
 
-	s0 := "INSERT INTO " + TblParticles + " (particle,iter,val" + m.xdbsql("x") + ") VALUES (?,?,?" + m.xdbsql("?") + ");"
-	s0b := "INSERT INTO " + TblParticlesMeshed + " (particle,iter,val" + m.xdbsql("x") + ") VALUES (?,?,?" + m.xdbsql("?") + ");"
-	s1 := "INSERT INTO " + TblParticlesBest + " (particle,iter,best" + m.xdbsql("x") + ") VALUES (?,?,?" + m.xdbsql("?") + ");"
-	for _, p := range m.Pop {
-		args := []interface{}{p.Id, m.count, p.Val}
-		args = append(args, pos2iface(p.Pos)...)
-		_, err := tx.Exec(s0, args...)
-		if checkdberr(err) {
-			return
-		}
-
-		args = []interface{}{p.Id, m.count, p.Best.Val}
-		args = append(args, pos2iface(p.Best.Pos)...)
-		_, err = tx.Exec(s1, args...)
-		if checkdberr(err) {
-			return
-		}
-
-		args = []interface{}{p.Id, m.count, p.Val}
-		args = append(args, pos2iface(mesh.Nearest(p.Pos))...)
-		_, err = tx.Exec(s0b, args...)
-		if checkdberr(err) {
-			return
-		}
-	}
-
-	s2 := "INSERT INTO " + TblBest + " (iter,val" + m.xdbsql("x") + ") VALUES (?,?" + m.xdbsql("?") + ");"
-	glob := m.best
-	args := []interface{}{m.count, glob.Val}
-	args = append(args, pos2iface(glob.Pos)...)
-	_, err = tx.Exec(s2, args...)
+	s0, err := tx.Prepare("INSERT INTO " + TblParticles + " (particle,iter,val,posid) VALUES (?,?,?,?);")
 	if checkdberr(err) {
 		return
 	}
-}
+	s0b, err := tx.Prepare("INSERT INTO " + TblParticlesMeshed + " (particle,iter,val,posid) VALUES (?,?,?,?);")
+	if checkdberr(err) {
+		return
+	}
+	s1, err := tx.Prepare("INSERT INTO " + TblParticlesBest + " (particle,iter,best,posid) VALUES (?,?,?,?);")
+	if checkdberr(err) {
+		return
+	}
 
-func (m *Method) xdbsql(op string) string {
-	s := ""
-	for i := range m.Pop[0].Pos {
-		if op == "?" {
-			s += ",?"
-		} else if op == "define" {
-			s += fmt.Sprintf(",x%v REAL", i)
-		} else if op == "x" {
-			s += fmt.Sprintf(",x%v", i)
-		} else {
-			panic("invalid db op " + op)
+	pts := []*optim.Point{}
+
+	for _, p := range m.Pop {
+		pts = append(pts, p.Point)
+
+		_, err := s0.Exec(p.Id, m.count, p.Val, p.HashSlice())
+		if checkdberr(err) {
+			return
+		}
+
+		_, err = s1.Exec(p.Id, m.count, p.Best.Val, p.Best.HashSlice())
+		if checkdberr(err) {
+			return
+		}
+
+		pp := &optim.Point{mesh.Nearest(p.Pos), p.Val}
+		_, err = s0b.Exec(p.Id, m.count, p.Val, pp.HashSlice())
+		if checkdberr(err) {
+			return
 		}
 	}
-	return s
-}
 
-func pos2iface(pos []float64) []interface{} {
-	iface := []interface{}{}
-	for _, v := range pos {
-		iface = append(iface, v)
+	s2, err := tx.Prepare("INSERT INTO " + TblBest + " (iter,val,posid) VALUES (?,?,?);")
+	glob := m.best
+	_, err = s2.Exec(m.count, glob.Val, glob.HashSlice())
+	if checkdberr(err) {
+		return
 	}
-	return iface
+
+	pts = append(pts, glob)
+	err = optim.RecordPointPos(tx, pts...)
+	if checkdberr(err) {
+		return
+	}
 }
 
 // TODO: remove all uses of this

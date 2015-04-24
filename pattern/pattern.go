@@ -4,7 +4,6 @@ import (
 	"crypto/sha1"
 	"database/sql"
 	"errors"
-	"fmt"
 	"log"
 	"math"
 	"sort"
@@ -183,38 +182,17 @@ func (m *Method) initdb() {
 		return
 	}
 
-	s := "CREATE TABLE IF NOT EXISTS " + TblPolls + " (iter INTEGER,val REAL"
-	s += m.xdbsql("define")
-	s += ");"
-
+	s := "CREATE TABLE IF NOT EXISTS " + TblPolls + " (iter INTEGER,val REAL,posid BLOB);"
 	_, err := m.Db.Exec(s)
 	if checkdberr(err) {
 		return
 	}
 
-	s = "CREATE TABLE IF NOT EXISTS " + TblInfo + " (iter INTEGER,step INTEGER,nsearch INTEGER,npoll INTEGER,val REAL"
-	s += m.xdbsql("define")
-	s += ");"
+	s = "CREATE TABLE IF NOT EXISTS " + TblInfo + " (iter INTEGER,step INTEGER,nsearch INTEGER,npoll INTEGER,val REAL,posid BLOB);"
 	_, err = m.Db.Exec(s)
 	if checkdberr(err) {
 		return
 	}
-}
-
-func (m Method) xdbsql(op string) string {
-	s := ""
-	for i := range m.Curr.Pos {
-		if op == "?" {
-			s += ",?"
-		} else if op == "define" {
-			s += fmt.Sprintf(",x%v REAL", i)
-		} else if op == "x" {
-			s += fmt.Sprintf(",x%v", i)
-		} else {
-			panic("invalid db op " + op)
-		}
-	}
-	return s
 }
 
 func (m Method) updateDb(nsearch, npoll *int, step float64) {
@@ -228,21 +206,24 @@ func (m Method) updateDb(nsearch, npoll *int, step float64) {
 	}
 	defer tx.Commit()
 
-	s1 := "INSERT INTO " + TblPolls + " (iter,val" + m.xdbsql("x") + ") VALUES (?,?" + m.xdbsql("?") + ");"
+	s1 := "INSERT INTO " + TblPolls + " (iter,val,posid) VALUES (?,?,?);"
 	for _, p := range m.Poller.Points() {
-		args := []interface{}{m.count, p.Val}
-		args = append(args, pos2iface(p.Pos)...)
-		_, err := tx.Exec(s1, args...)
+		_, err := tx.Exec(s1, m.count, p.Val, p.HashSlice())
 		if checkdberr(err) {
 			return
 		}
 	}
 
-	s2 := "INSERT INTO " + TblInfo + " (iter,step,nsearch, npoll,val" + m.xdbsql("x") + ") VALUES (?,?,?,?,?" + m.xdbsql("?") + ");"
 	glob := m.Curr
-	args := []interface{}{m.count, step, *nsearch, *npoll, glob.Val}
-	args = append(args, pos2iface(glob.Pos)...)
-	_, err = tx.Exec(s2, args...)
+	s2 := "INSERT INTO " + TblInfo + " (iter,step,nsearch, npoll,val,posid) VALUES (?,?,?,?,?,?);"
+	_, err = tx.Exec(s2, m.count, step, *nsearch, *npoll, glob.Val, glob.HashSlice())
+	if checkdberr(err) {
+		return
+	}
+
+	pts := m.Poller.Points()
+	pts = append(pts, glob)
+	err = optim.RecordPointPos(tx, pts...)
 	if checkdberr(err) {
 		return
 	}
@@ -520,14 +501,6 @@ func RandomN(n int) SpanFunc {
 	}
 }
 
-func pos2iface(pos []float64) []interface{} {
-	iface := []interface{}{}
-	for _, v := range pos {
-		iface = append(iface, v)
-	}
-	return iface
-}
-
 func direcbetween(from, to *optim.Point, m optim.Mesh) []int {
 	d := make([]int, from.Len())
 	step := m.Step()
@@ -539,7 +512,7 @@ func direcbetween(from, to *optim.Point, m optim.Mesh) []int {
 
 func checkdberr(err error) bool {
 	if err != nil {
-		log.Print("swarm: db write failed -", err)
+		log.Print("pattern: db write failed -", err)
 		return true
 	}
 	return false

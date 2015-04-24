@@ -2,6 +2,7 @@ package optim
 
 import (
 	"crypto/sha1"
+	"database/sql"
 	"encoding/binary"
 	"fmt"
 	"io"
@@ -101,6 +102,11 @@ func (p *Point) Hash() [sha1.Size]byte {
 		binary.BigEndian.PutUint64(data[i*8:], math.Float64bits(p.Pos[i]))
 	}
 	return sha1.Sum(data)
+}
+
+func (p *Point) HashSlice() []byte {
+	h := p.Hash()
+	return h[:]
 }
 
 type Method interface {
@@ -340,6 +346,30 @@ func StackConstrBoxed(lb, ub []float64, low, A, up *mat64.Dense) (stackA, b *mat
 	stacked := &mat64.Dense{}
 	stacked.Stack(A, boxA)
 	return StackConstr(stacklow, stacked, stackup)
+}
+
+func RecordPointPos(tx *sql.Tx, pts ...*Point) error {
+	s := "CREATE TABLE IF NOT EXISTS points (posid BLOB,dim INTEGER,val REAL);"
+	_, err := tx.Exec(s)
+	if err != nil {
+		return err
+	}
+
+	stmt, err := tx.Prepare("INSERT INTO points VALUES (?,?,?);")
+	if err != nil {
+		return err
+	}
+
+	for _, p := range pts {
+		id := p.HashSlice()
+		for dim, pos := range p.Pos {
+			_, err = stmt.Exec(id, dim, pos)
+			if err != nil {
+				return fmt.Errorf("db write failed: %v", err)
+			}
+		}
+	}
+	return nil
 }
 
 func StackConstr(low, A, up *mat64.Dense) (stackA, b *mat64.Dense, ranges []float64) {
