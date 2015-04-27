@@ -273,6 +273,9 @@ func (b byval) Swap(i, j int)      { b[i], b[j] = b[j], b[i] }
 // must be false and best must be from - neval may be non-zero.
 func (cp *Poller) Poll(obj optim.Objectiver, ev optim.Evaler, m optim.Mesh, from *optim.Point) (success bool, best *optim.Point, neval int, err error) {
 	best = from
+	if cp.SpanFn == nil {
+		cp.SpanFn = Compass2N
+	}
 
 	pollpoints := []*optim.Point{}
 
@@ -283,15 +286,12 @@ func (cp *Poller) Poll(obj optim.Objectiver, ev optim.Evaler, m optim.Mesh, from
 	if h != cp.prevhash || cp.prevstep != m.Step() {
 		// TODO: write test that checks we poll compass dirs again if only mesh
 		// step changed (and not from point)
-		if cp.SpanFn == nil {
-			pollpoints = append(pollpoints, genPollPoints(from, Compass2N, m)...)
-		} else {
-			pollpoints = append(pollpoints, genPollPoints(from, cp.SpanFn, m)...)
-		}
+		pollpoints = genPollPoints(from, cp.SpanFn, m)
 		cp.prevhash = h
 	} else {
 		// Use random directions instead.
-		pollpoints = append(pollpoints, genPollPoints(from, RandomN(2*from.Len()), m)...)
+		n := len(genPollPoints(from, cp.SpanFn, m))
+		pollpoints = genPollPoints(from, RandomN(n), m)
 	}
 	cp.prevstep = m.Step()
 
