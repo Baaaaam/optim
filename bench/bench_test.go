@@ -55,7 +55,7 @@ func TestBenchPSwarmRosen(t *testing.T) {
 		m, mesh := pswarmsolver(fn, nil, npar)
 		low, _ := fn.Bounds()
 		ndim := len(low)
-		m.Poller = &pattern.Poller{SpanFn: pattern.RandomN(2 * ndim)}
+		m.Poller = &pattern.Poller{SpanFn: pattern.RandomN(ndim)}
 		return &optim.Solver{
 			Method:  m,
 			Obj:     optim.Func(fn.Eval),

@@ -99,7 +99,7 @@ func New(start *optim.Point, opts ...Option) *Method {
 	m := &Method{
 		Curr:         start,
 		ev:           optim.SerialEvaler{},
-		Poller:       &Poller{Nkeep: start.Len(), SkipEps: 1e-10},
+		Poller:       &Poller{Nkeep: start.Len() / 4, SkipEps: 1e-10},
 		Searcher:     NullSearcher{},
 		NsuccessGrow: -1,
 	}
@@ -298,12 +298,11 @@ func (cp *Poller) Poll(obj optim.Objectiver, ev optim.Evaler, m optim.Mesh, from
 	// Add successful directions from last poll.  We want to add these points
 	// in front of the other points so we can potentially stop earlier if
 	// polling opportunistically.
-	prevgood := make([]*optim.Point, len(cp.keepdirecs))
+	perms := optim.Rand.Perm(len(pollpoints))
 	for i, dir := range cp.keepdirecs {
-		prevgood[i] = pointFromDirec(from, dir.dir, m)
+		swapindex := perms[i]
+		pollpoints[swapindex] = pointFromDirec(from, dir.dir, m)
 	}
-	pollpoints = append(prevgood, pollpoints...)
-	//pollpoints = append(pollpoints, prevgood...)
 
 	cp.points = make([]*optim.Point, 0, len(pollpoints))
 	if cp.SkipEps == 0 {
@@ -468,8 +467,9 @@ func CompassNp1(ndim int) [][]int {
 	return dirs
 }
 
-// RandomN returns ndim random polling directions that exclude the
-// compass directions.
+// RandomN returns n random polling directions by randomly choosing a number
+// of dimensions to receive a non-zero step and randomly assigning each
+// non-zero step either a forward or backward polarity.
 func RandomN(n int) SpanFunc {
 	return func(ndim int) [][]int {
 		dirs := make([][]int, 0, n)
@@ -478,15 +478,11 @@ func RandomN(n int) SpanFunc {
 			d2 := make([]int, ndim)
 
 			nNonzero := 1
-			if ndim == 1 { // compass directions cover everything
-				return dirs
-			} else if ndim == 2 { // this check prevents calling Intn(0) - which is invalid
-				nNonzero = 2 // exclude compass directions
-			} else {
-				// Intn(-2)+2 is to exclude vector of all zeros and compass directions.
-				//nNonzero = optim.Rand.Intn(ndim-2) + 2
-				nNonzero = optim.Rand.Intn(2) + 2
-				// TODO: skew this nNonzero distribution to have more lower numbers
+			if ndim > 1 {
+				// the +1 is to exclude vector of all zeros. And since Intn
+				// returns numbers < ndim we don't have to worry about
+				// nNonzero being greater than ndim.
+				nNonzero = optim.Rand.Intn(ndim) + 1
 			}
 			perms := optim.Rand.Perm(ndim)
 			for i := 0; i < nNonzero; i++ {
