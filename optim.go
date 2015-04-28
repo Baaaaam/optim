@@ -217,7 +217,7 @@ func uniqof(ps []*Point) []*Point {
 }
 
 type ParallelEvaler struct {
-	MinSuccessFrac float64
+	ContinueOnErr bool
 }
 
 func (ev ParallelEvaler) Eval(obj Objectiver, points ...*Point) (results []*Point, n int, err error) {
@@ -248,7 +248,7 @@ func (ev ParallelEvaler) Eval(obj Objectiver, points ...*Point) (results []*Poin
 		}
 	}
 
-	if ev.MinSuccessFrac > 0 && len(results) >= int(float64(len(points))*ev.MinSuccessFrac) {
+	if ev.ContinueOnErr && len(results) > 0 {
 		return results, n, nil
 	} else {
 		return results, n, err
