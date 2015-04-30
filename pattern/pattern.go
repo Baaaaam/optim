@@ -299,7 +299,15 @@ func (cp *Poller) Poll(obj optim.Objectiver, ev optim.Evaler, m optim.Mesh, from
 	// in front of the other points so we can potentially stop earlier if
 	// polling opportunistically.
 	perms := optim.Rand.Perm(len(pollpoints))
-	for i, dir := range cp.keepdirecs {
+
+	// this is an extra safety check to make sure we don't index out of bounds
+	// on the perms slice
+	max := len(cp.keepdirecs)
+	if max > len(perms) {
+		max = len(perms)
+	}
+
+	for i, dir := range cp.keepdirecs[:max] {
 		swapindex := perms[i]
 		pollpoints[swapindex] = pointFromDirec(from, dir.dir, m)
 	}
@@ -341,9 +349,14 @@ func (cp *Poller) Poll(obj optim.Objectiver, ev optim.Evaler, m optim.Mesh, from
 	}
 	best = nextbest
 
+	nkeep := cp.Nkeep
+	if max := len(pollpoints) / 4; max < nkeep {
+		nkeep = max
+	}
+
 	sort.Sort(byval(cp.keepdirecs))
-	if len(cp.keepdirecs) > cp.Nkeep {
-		cp.keepdirecs = cp.keepdirecs[:cp.Nkeep]
+	if len(cp.keepdirecs) > nkeep {
+		cp.keepdirecs = cp.keepdirecs[:nkeep]
 	}
 
 	if best.Val < from.Val {
