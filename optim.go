@@ -218,9 +218,19 @@ func uniqof(ps []*Point) []*Point {
 
 type ParallelEvaler struct {
 	ContinueOnErr bool
+	NConcurrent   int
 }
 
 func (ev ParallelEvaler) Eval(obj Objectiver, points ...*Point) (results []*Point, n int, err error) {
+	nbuf := ev.NConcurrent
+	if nbuf == 0 {
+		nbuf = 100000
+	}
+	limiter := make(chan bool, nbuf)
+	for i := 0; i < nbuf; i++ {
+		limiter <- true
+	}
+
 	ch := make(chan errpoint, len(points))
 	wg := sync.WaitGroup{}
 	uniq := uniqof(points)
@@ -228,6 +238,8 @@ func (ev ParallelEvaler) Eval(obj Objectiver, points ...*Point) (results []*Poin
 		wg.Add(1)
 		go func(i int, p *Point) {
 			defer wg.Done()
+			<-limiter
+			defer func() { limiter <- true }()
 			perr := errpoint{Point: p}
 			perr.Val, perr.Err = obj.Objective(p.Pos)
 			ch <- perr
