@@ -312,6 +312,13 @@ func (cp *Poller) Poll(obj optim.Objectiver, ev optim.Evaler, m optim.Mesh, from
 		pollpoints[swapindex] = pointFromDirec(from, dir.dir, m)
 	}
 
+	// project points onto feasible region and mesh grid
+	if m != nil {
+		for _, p := range pollpoints {
+			p.Pos = m.Nearest(p.Pos)
+		}
+	}
+
 	cp.points = make([]*optim.Point, 0, len(pollpoints))
 	if cp.SkipEps == 0 {
 		cp.points = pollpoints
