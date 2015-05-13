@@ -46,19 +46,19 @@ func DiscreteSearch(m *Method) {
 
 // Poll2N sets the method to poll in both forward and backward in every
 // compass direction.
-func Poll2N(m *Method) { m.Poller.SpanFn = Compass2N }
+func Poll2N(m *Method) { m.Poller.Spanner = Compass2N{} }
 
 // PollNp1 sets the method to poll in n compass directions with random
 // polarity plus one direction with the opposite of all other directions in
 // every dimension.
-func PollNp1(m *Method) { m.Poller.SpanFn = CompassNp1 }
+func PollNp1(m *Method) { m.Poller.Spanner = CompassNp1{} }
 
 // PollRandN sets the method to poll in n random directions setting the
 // direction for a randomly chosen number of dimensions to +/- step size.
 func PollRandN(n int) Option {
 	return func(m *Method) {
 		if n > 0 {
-			m.Poller.SpanFn = RandomN(n)
+			m.Poller.Spanner = &RandomN{N: n}
 		}
 	}
 }
@@ -70,7 +70,7 @@ func PollRandN(n int) Option {
 func PollRandNMask(n int, mask []bool) Option {
 	return func(m *Method) {
 		if n > 0 {
-			m.Poller.SpanFn = RandomNMask(n, mask)
+			m.Poller.Spanner = &RandomN{N: n, Mask: mask}
 		}
 	}
 }
@@ -167,6 +167,8 @@ func (m *Method) Iterate(o optim.Objectiver, mesh optim.Mesh) (best *optim.Point
 	mesh.SetOrigin(m.Curr.Pos) // TODO: test that this doesn't get set to Zero pos [0 0 0...] on first iteration.
 
 	success, best, nevalpoll, err = m.Poller.Poll(o, m.ev, mesh, m.Curr)
+	m.Poller.Spanner.Update(mesh.Step(), success)
+
 	n += nevalpoll
 	if err != nil {
 		return m.Curr, n, err
@@ -256,7 +258,7 @@ type Poller struct {
 	// is excluded from evaluation.  This can occur if a mesh projection
 	// results in a point being projected back near the poll origin point.
 	SkipEps    float64
-	SpanFn     SpanFunc
+	Spanner    Spanner
 	keepdirecs []direc
 	points     []*optim.Point
 	prevhash   [sha1.Size]byte
@@ -285,8 +287,8 @@ func (b byval) Swap(i, j int)      { b[i], b[j] = b[j], b[i] }
 // must be false and best must be from - neval may be non-zero.
 func (cp *Poller) Poll(obj optim.Objectiver, ev optim.Evaler, m optim.Mesh, from *optim.Point) (success bool, best *optim.Point, neval int, err error) {
 	best = from
-	if cp.SpanFn == nil {
-		cp.SpanFn = Compass2N
+	if cp.Spanner == nil {
+		cp.Spanner = Compass2N{}
 	}
 
 	pollpoints := []*optim.Point{}
@@ -298,12 +300,12 @@ func (cp *Poller) Poll(obj optim.Objectiver, ev optim.Evaler, m optim.Mesh, from
 	if h != cp.prevhash || cp.prevstep != m.Step() {
 		// TODO: write test that checks we poll compass dirs again if only mesh
 		// step changed (and not from point)
-		pollpoints = genPollPoints(from, cp.SpanFn, m)
+		pollpoints = genPollPoints(from, cp.Spanner, m)
 		cp.prevhash = h
 	} else {
 		// Use random directions instead.
-		n := len(genPollPoints(from, cp.SpanFn, m))
-		pollpoints = genPollPoints(from, RandomN(n), m)
+		n := len(genPollPoints(from, cp.Spanner, m))
+		pollpoints = genPollPoints(from, &RandomN{N: n}, m)
 	}
 	cp.prevstep = m.Step()
 
@@ -436,9 +438,9 @@ func (s *objStopper) Objective(v []float64) (float64, error) {
 	return obj, nil
 }
 
-func genPollPoints(from *optim.Point, span SpanFunc, m optim.Mesh) []*optim.Point {
+func genPollPoints(from *optim.Point, span Spanner, m optim.Mesh) []*optim.Point {
 	ndim := from.Len()
-	dirs := span(ndim)
+	dirs := span.Span(ndim)
 	polls := make([]*optim.Point, 0, len(dirs))
 	for _, d := range dirs {
 		polls = append(polls, pointFromDirec(from, d, m))
@@ -456,12 +458,21 @@ func pointFromDirec(from *optim.Point, direc []int, m optim.Mesh) *optim.Point {
 	return &optim.Point{m.Nearest(pos), math.Inf(1)}
 }
 
-// SpanFunc is returns a set of poll directions (maybe positive spanning set?)
-type SpanFunc func(ndim int) [][]int
+// Spanner is returns a set of poll directions (maybe positive spanning set?)
+type Spanner interface {
+	Update(step float64, prevsuccess bool)
+	// Span returns a set of ndim dimensional polling directions (either a 1,
+	// 0, -1).
+	Span(ndim int) [][]int
+}
 
 // Compass2N returns a compass positive basis set of polling directions in a
 // randomized order.
-func Compass2N(ndim int) [][]int {
+type Compass2N struct{}
+
+func (c Compass2N) Update(step float64, prevsuccess bool) {}
+
+func (c Compass2N) Span(ndim int) [][]int {
 	dirs := make([][]int, 2*ndim)
 	perms := optim.Rand.Perm(ndim)
 	for i := 0; i < ndim; i++ {
@@ -476,7 +487,11 @@ func Compass2N(ndim int) [][]int {
 	return dirs
 }
 
-func CompassNp1(ndim int) [][]int {
+type CompassNp1 struct{}
+
+func (c CompassNp1) Update(step float64, prevsuccess bool) {}
+
+func (c CompassNp1) Span(ndim int) [][]int {
 	dirs := make([][]int, 0, ndim+1)
 	final := make([]int, ndim)
 	for i := 0; i < ndim; i++ {
@@ -499,16 +514,43 @@ func CompassNp1(ndim int) [][]int {
 	return dirs
 }
 
-// RandomNMask returns n random polling directions by randomly choosing a number
+// RandomN returns n random polling directions by randomly choosing a number
 // of dimensions to receive a non-zero step and randomly assigning each
 // non-zero step either a forward or backward polarity.  mask specifies which
 // dimensions are allowed to have a nonzero step.
-func RandomNMask(n int, mask []bool) SpanFunc {
+type RandomN struct {
+	// N is the number of random directions to generate.
+	N int
+	// Mask has either true or false for each dimension indicating whether or
+	// not it is allowed to be nonzero in the generated drections.
+	Mask        []bool
+	nonzeroFrac float64
+	origstep    float64
+}
+
+func (r *RandomN) Update(step float64, prevsuccess bool) {
+	if r.origstep == 0 {
+		r.origstep = step
+	}
+	r.nonzeroFrac = math.Min(1, math.Sqrt(step/r.origstep))
+}
+
+func (r *RandomN) Span(ndim int) [][]int {
+	if r.nonzeroFrac == 0 {
+		r.nonzeroFrac = 1
+	}
+	if r.Mask == nil {
+		r.Mask = make([]bool, ndim)
+		for i := range r.Mask {
+			r.Mask[i] = true
+		}
+	}
+
 	// index map tells us at which index into a full dimensional direction
 	// vector to place a non-zero value into.
 	indexmap := []int{}
 	nactive := 0
-	for i, active := range mask {
+	for i, active := range r.Mask {
 		if active {
 			nactive++
 			indexmap = append(indexmap, i)
@@ -516,54 +558,38 @@ func RandomNMask(n int, mask []bool) SpanFunc {
 	}
 	if nactive == 0 {
 		panic("pattern: mask cannot be zero length")
+	} else if ndim != len(r.Mask) {
+		panic("pattern: ndim != len(mask)")
 	}
 
-	return func(ndim int) [][]int {
-		if ndim != len(mask) {
-			panic("pattern: ndim != len(mask)")
-		}
-		dirs := make([][]int, 0, n)
-		for len(dirs) < n {
-			d1 := make([]int, ndim)
-			d2 := make([]int, ndim)
+	dirs := make([][]int, 0, r.N)
+	for len(dirs) < r.N {
+		d1 := make([]int, ndim)
+		d2 := make([]int, ndim)
 
-			nNonzero := 1
-			if nactive > 1 {
-				// the +1 is to exclude vector of all zeros. And since Intn
-				// returns numbers < nactive we don't have to worry about
-				// nNonzero being greater than nactive.
-				nNonzero = optim.Rand.Intn(nactive) + 1
+		nNonzero := 1
+		maxnonzero := int(float64(nactive) * r.nonzeroFrac)
+		if maxnonzero > 1 {
+			// the +1 is to exclude vector of all zeros. And since Intn
+			// returns numbers < nactive we don't have to worry about
+			// nNonzero being greater than nactive.
+			nNonzero = optim.Rand.Intn(maxnonzero) + 1
+		}
+		perms := optim.Rand.Perm(nactive)
+		for i := 0; i < nNonzero; i++ {
+			r := optim.Rand.Intn(2)
+			if r == 0 {
+				d1[indexmap[perms[i]]] = 1
+				d2[indexmap[perms[i]]] = -1
+			} else {
+				d1[indexmap[perms[i]]] = -1
+				d2[indexmap[perms[i]]] = 1
 			}
-			perms := optim.Rand.Perm(nactive)
-			for i := 0; i < nNonzero; i++ {
-				r := optim.Rand.Intn(2)
-				if r == 0 {
-					d1[indexmap[perms[i]]] = 1
-					d2[indexmap[perms[i]]] = -1
-				} else {
-					d1[indexmap[perms[i]]] = -1
-					d2[indexmap[perms[i]]] = 1
-				}
-			}
-			dirs = append(dirs, d1)
-			dirs = append(dirs, d2)
 		}
-		return dirs
+		dirs = append(dirs, d1)
+		dirs = append(dirs, d2)
 	}
-}
-
-// RandomN returns n random polling directions by randomly choosing a number
-// of dimensions to receive a non-zero step and randomly assigning each
-// non-zero step either a forward or backward polarity.
-func RandomN(n int) SpanFunc {
-	return func(ndim int) [][]int {
-		mask := make([]bool, ndim)
-		for i := range mask {
-			mask[i] = true
-		}
-		fn := RandomNMask(n, mask)
-		return fn(ndim)
-	}
+	return dirs
 }
 
 func direcbetween(from, to *optim.Point, m optim.Mesh) []int {

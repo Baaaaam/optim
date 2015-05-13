@@ -55,7 +55,7 @@ func TestBenchPSwarmRosen(t *testing.T) {
 		m, mesh := pswarmsolver(fn, nil, npar)
 		low, _ := fn.Bounds()
 		ndim := len(low)
-		m.Poller = &pattern.Poller{SpanFn: pattern.RandomN(ndim)}
+		m.Poller = &pattern.Poller{Spanner: &pattern.RandomN{N: ndim}}
 		return &optim.Solver{
 			Method:  m,
 			Obj:     optim.Func(fn.Eval),
@@ -119,7 +119,7 @@ func TestOverviewPattern(t *testing.T) {
 	for _, fn := range []bench.Func{bench.Rosenbrock{NDim: 2}} {
 		sfn := func() *optim.Solver {
 			m, mesh := patternsolver(fn, nil)
-			m.Poller = &pattern.Poller{SpanFn: pattern.CompassNp1}
+			m.Poller = &pattern.Poller{Spanner: pattern.CompassNp1{}}
 			return &optim.Solver{
 				Method:  m,
 				Obj:     optim.Func(fn.Eval),
