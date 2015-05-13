@@ -63,6 +63,18 @@ func PollRandN(n int) Option {
 	}
 }
 
+// PollRandNMask sets the method to poll in n random directions setting the
+// direction for a randomly chosen number of dimensions to +/- step size.
+// mask specifies which of the dimensions are allowed to be nonzero and
+// len(mask) must be equal to the number of dimensions.
+func PollRandNMask(n int, mask []bool) Option {
+	return func(m *Method) {
+		if n > 0 {
+			m.Poller.SpanFn = RandomNMask(n, mask)
+		}
+	}
+}
+
 func DB(db *sql.DB) Option {
 	return func(m *Method) {
 		m.Db = db
@@ -487,38 +499,70 @@ func CompassNp1(ndim int) [][]int {
 	return dirs
 }
 
-// RandomN returns n random polling directions by randomly choosing a number
+// RandomNMask returns n random polling directions by randomly choosing a number
 // of dimensions to receive a non-zero step and randomly assigning each
-// non-zero step either a forward or backward polarity.
-func RandomN(n int) SpanFunc {
+// non-zero step either a forward or backward polarity.  mask specifies which
+// dimensions are allowed to have a nonzero step.
+func RandomNMask(n int, mask []bool) SpanFunc {
+	// index map tells us at which index into a full dimensional direction
+	// vector to place a non-zero value into.
+	indexmap := []int{}
+	nactive := 0
+	for i, active := range mask {
+		if active {
+			nactive++
+			indexmap = append(indexmap, i)
+		}
+	}
+	if nactive == 0 {
+		panic("pattern: mask cannot be zero length")
+	}
+
 	return func(ndim int) [][]int {
+		if ndim != len(mask) {
+			panic("pattern: ndim != len(mask)")
+		}
 		dirs := make([][]int, 0, n)
 		for len(dirs) < n {
 			d1 := make([]int, ndim)
 			d2 := make([]int, ndim)
 
 			nNonzero := 1
-			if ndim > 1 {
+			if nactive > 1 {
 				// the +1 is to exclude vector of all zeros. And since Intn
-				// returns numbers < ndim we don't have to worry about
-				// nNonzero being greater than ndim.
-				nNonzero = optim.Rand.Intn(ndim) + 1
+				// returns numbers < nactive we don't have to worry about
+				// nNonzero being greater than nactive.
+				nNonzero = optim.Rand.Intn(nactive) + 1
 			}
-			perms := optim.Rand.Perm(ndim)
+			perms := optim.Rand.Perm(nactive)
 			for i := 0; i < nNonzero; i++ {
 				r := optim.Rand.Intn(2)
 				if r == 0 {
-					d1[perms[i]] = 1
-					d2[perms[i]] = -1
+					d1[indexmap[perms[i]]] = 1
+					d2[indexmap[perms[i]]] = -1
 				} else {
-					d1[perms[i]] = -1
-					d2[perms[i]] = 1
+					d1[indexmap[perms[i]]] = -1
+					d2[indexmap[perms[i]]] = 1
 				}
 			}
 			dirs = append(dirs, d1)
 			dirs = append(dirs, d2)
 		}
 		return dirs
+	}
+}
+
+// RandomN returns n random polling directions by randomly choosing a number
+// of dimensions to receive a non-zero step and randomly assigning each
+// non-zero step either a forward or backward polarity.
+func RandomN(n int) SpanFunc {
+	return func(ndim int) [][]int {
+		mask := make([]bool, ndim)
+		for i := range mask {
+			mask[i] = true
+		}
+		fn := RandomNMask(n, mask)
+		return fn(ndim)
 	}
 }
 
