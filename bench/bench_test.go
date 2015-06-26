@@ -6,7 +6,7 @@ import (
 	"math/rand"
 	"testing"
 
-	_ "github.com/mxk/go-sqlite/sqlite3"
+	_ "github.com/rwcarlsen/go-sqlite/sqlite3"
 	"github.com/rwcarlsen/optim"
 	"github.com/rwcarlsen/optim/bench"
 	"github.com/rwcarlsen/optim/pattern"
