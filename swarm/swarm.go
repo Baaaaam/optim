@@ -414,6 +414,7 @@ func (m *Method) updateDb(mesh optim.Mesh) {
 	for _, p := range m.Pop {
 		vel := &optim.Point{Pos: p.Vel}
 		pts = append(pts, p.Point)
+		pts = append(pts, p.Best) // best might be a projected location and not present in normal eval points
 		pts = append(pts, vel)
 
 		_, err := s0.Exec(p.Id, m.count, p.Val, p.HashSlice(), vel.HashSlice(), p.L2Vel())
