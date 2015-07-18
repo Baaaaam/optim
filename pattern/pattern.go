@@ -526,13 +526,24 @@ type RandomN struct {
 	Mask        []bool
 	nonzeroFrac float64
 	origstep    float64
+	nConsecFail int
 }
 
 func (r *RandomN) Update(step float64, prevsuccess bool) {
 	if r.origstep == 0 {
 		r.origstep = step
 	}
-	r.nonzeroFrac = math.Min(1, math.Sqrt(step/r.origstep))
+
+	if !prevsuccess {
+		r.nConsecFail++
+	} else {
+		r.nConsecFail = 0
+	}
+
+	nStart := 2
+	nOver := 3.0
+	mult := math.Max(0.01, 1-math.Max(0, float64((r.nConsecFail-nStart)%int(nOver)))/nOver)
+	r.nonzeroFrac = math.Min(1, mult*math.Sqrt(step/r.origstep))
 }
 
 func (r *RandomN) Span(ndim int) [][]int {
