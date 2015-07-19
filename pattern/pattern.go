@@ -325,7 +325,7 @@ func (cp *Poller) Poll(obj optim.Objectiver, ev optim.Evaler, m optim.Mesh, from
 		swapindex := perms[i]
 		pollpoints[swapindex] = pointFromDirec(from, dir.dir, m)
 	}
-	cp.keepdirecs = cp.keepdirecs[:max]
+	cp.keepdirecs = cp.keepdirecs[:0]
 
 	// project points onto feasible region and mesh grid
 	if m != nil {
