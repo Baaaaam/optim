@@ -360,6 +360,7 @@ func (cp *Poller) Poll(obj optim.Objectiver, ev optim.Evaler, m optim.Mesh, from
 	nextbest := from
 
 	// Sort results and keep the best Nkeep as poll directions.
+	cp.keepdirecs = cp.keepdirecs[:0]
 	for _, p := range results {
 		if p.Val < best.Val {
 			cp.keepdirecs = append(cp.keepdirecs, direc{direcbetween(from, p, m), p.Val})
@@ -540,10 +541,10 @@ func (r *RandomN) Update(step float64, prevsuccess bool) {
 		r.nConsecFail = 0
 	}
 
-	nStart := 2
+	nStart := 1
 	nOver := 3.0
 	mult := math.Max(0.01, 1-math.Max(0, float64((r.nConsecFail-nStart)%int(nOver)))/nOver)
-	r.nonzeroFrac = math.Min(1, mult*math.Sqrt(step/r.origstep))
+	r.nonzeroFrac = mult
 }
 
 func (r *RandomN) Span(ndim int) [][]int {
