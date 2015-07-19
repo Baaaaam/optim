@@ -85,8 +85,8 @@ func SkipEps(eps float64) Option { return func(m *Method) { m.Poller.SkipEps = e
 
 func Nkeep(n int) Option { return func(m *Method) { m.Poller.Nkeep = n } }
 
-func ResetStep(threshold float64) Option {
-	return func(m *Method) { m.ResetStep = threshold }
+func ResetStep(threshold, tostep float64) Option {
+	return func(m *Method) { m.ResetStep = threshold; m.ResetStepSize = tostep }
 }
 
 type Method struct {
@@ -98,13 +98,14 @@ type Method struct {
 	nsuccess       int  // (internal) number of successive successful polls
 	Db             *sql.DB
 	// ResetStep is a step size threshold below which the mesh step is reset
-	// to its original starting value.  This can be useful for problems where
+	// to ResetStepSize.  This can be useful for problems where
 	// the significance of a particular step size of one variable may be a
 	// function of the value other variables.
-	ResetStep float64
-	origstep  float64
-	count     int
-	ev        optim.Evaler
+	ResetStep     float64
+	ResetStepSize float64
+	origstep      float64
+	count         int
+	ev            optim.Evaler
 }
 
 func New(start *optim.Point, opts ...Option) *Method {
@@ -135,7 +136,7 @@ func (m *Method) Iterate(o optim.Objectiver, mesh optim.Mesh) (best *optim.Point
 	if m.count == 0 {
 		m.origstep = mesh.Step()
 	} else if mesh.Step() < m.ResetStep {
-		mesh.SetStep(m.origstep)
+		mesh.SetStep(m.ResetStepSize)
 	}
 
 	var nevalsearch, nevalpoll int
@@ -527,25 +528,13 @@ type RandomN struct {
 	Mask        []bool
 	nonzeroFrac float64
 	origstep    float64
-	nConsecFail int
 }
 
 func (r *RandomN) Update(step float64, prevsuccess bool) {
 	if r.origstep == 0 {
 		r.origstep = step
 	}
-
-	if !prevsuccess {
-		r.nConsecFail++
-	} else {
-		r.nConsecFail = 0
-	}
-
-	//nStart := 1
-	//nOver := 3.0
-	//mult := math.Max(0.01, 1-math.Max(0, float64((r.nConsecFail-nStart)%int(nOver)))/nOver)
-	//r.nonzeroFrac = mult
-	r.nonzeroFrac = 1
+	r.nonzeroFrac = math.Min(1, math.Sqrt(step/r.origstep))
 }
 
 func (r *RandomN) Span(ndim int) [][]int {
