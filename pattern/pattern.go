@@ -325,6 +325,7 @@ func (cp *Poller) Poll(obj optim.Objectiver, ev optim.Evaler, m optim.Mesh, from
 		swapindex := perms[i]
 		pollpoints[swapindex] = pointFromDirec(from, dir.dir, m)
 	}
+	cp.keepdirecs = cp.keepdirecs[:max]
 
 	// project points onto feasible region and mesh grid
 	if m != nil {
@@ -360,7 +361,6 @@ func (cp *Poller) Poll(obj optim.Objectiver, ev optim.Evaler, m optim.Mesh, from
 	nextbest := from
 
 	// Sort results and keep the best Nkeep as poll directions.
-	cp.keepdirecs = cp.keepdirecs[:0]
 	for _, p := range results {
 		if p.Val < best.Val {
 			cp.keepdirecs = append(cp.keepdirecs, direc{direcbetween(from, p, m), p.Val})
