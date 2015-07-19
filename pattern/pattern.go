@@ -541,10 +541,11 @@ func (r *RandomN) Update(step float64, prevsuccess bool) {
 		r.nConsecFail = 0
 	}
 
-	nStart := 1
-	nOver := 3.0
-	mult := math.Max(0.01, 1-math.Max(0, float64((r.nConsecFail-nStart)%int(nOver)))/nOver)
-	r.nonzeroFrac = mult
+	//nStart := 1
+	//nOver := 3.0
+	//mult := math.Max(0.01, 1-math.Max(0, float64((r.nConsecFail-nStart)%int(nOver)))/nOver)
+	//r.nonzeroFrac = mult
+	r.nonzeroFrac = 1
 }
 
 func (r *RandomN) Span(ndim int) [][]int {
