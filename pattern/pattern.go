@@ -12,7 +12,6 @@ import (
 )
 
 var FoundBetterErr = errors.New("better position discovered")
-var ZeroStepErr = errors.New("poll step size contracted to zero")
 
 const (
 	TblPolls = "patternpolls"
