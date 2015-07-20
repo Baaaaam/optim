@@ -258,12 +258,16 @@ type Poller struct {
 	// SkipEps is the distance from the center point within which a poll point
 	// is excluded from evaluation.  This can occur if a mesh projection
 	// results in a point being projected back near the poll origin point.
-	SkipEps    float64
-	Spanner    Spanner
-	keepdirecs []direc
-	points     []*optim.Point
-	prevhash   [sha1.Size]byte
-	prevstep   float64
+	SkipEps     float64
+	Spanner     Spanner
+	keepdirecs  []direc
+	points      []*optim.Point
+	prevhash    [sha1.Size]byte
+	prevstep    float64
+	nConsecFail int
+	// FlipCompass is the number of iterations of consecutive failed polls
+	// after which the poller switches to CompassNp1 polling permanently.
+	FlipCompass int
 }
 
 func (cp *Poller) Points() []*optim.Point { return cp.points }
@@ -298,16 +302,12 @@ func (cp *Poller) Poll(obj optim.Objectiver, ev optim.Evaler, m optim.Mesh, from
 	// before.  DONT DELETE - this can fire sometimes if the mesh isn't
 	// allowed to contract below a certain step (i.e. integer meshes).
 	h := from.Hash()
-	if h != cp.prevhash || cp.prevstep != m.Step() {
-		// TODO: write test that checks we poll compass dirs again if only mesh
-		// step changed (and not from point)
-		pollpoints = genPollPoints(from, cp.Spanner, m)
-		cp.prevhash = h
-	} else {
-		// Use random directions instead.
-		n := len(genPollPoints(from, cp.Spanner, m))
-		pollpoints = genPollPoints(from, &RandomN{N: n}, m)
+	if cp.FlipCompass > 0 && cp.nConsecFail >= cp.FlipCompass {
+		// Use compass directions instead
+		cp.Spanner = CompassNp1{}
 	}
+	pollpoints = genPollPoints(from, cp.Spanner, m)
+	cp.prevhash = h
 	cp.prevstep = m.Step()
 
 	// Add successful directions from last poll.  We want to add these points
@@ -322,11 +322,13 @@ func (cp *Poller) Poll(obj optim.Objectiver, ev optim.Evaler, m optim.Mesh, from
 		max = len(perms)
 	}
 
-	for i, dir := range cp.keepdirecs[:max] {
-		swapindex := perms[i]
-		pollpoints[swapindex] = pointFromDirec(from, dir.dir, m)
+	c2n := Compass2N{}
+	if cp.Spanner != c2n {
+		for i, dir := range cp.keepdirecs[:max] {
+			swapindex := perms[i]
+			pollpoints[swapindex] = pointFromDirec(from, dir.dir, m)
+		}
 	}
-	cp.keepdirecs = cp.keepdirecs[:0]
 
 	// project points onto feasible region and mesh grid
 	if m != nil {
@@ -354,6 +356,7 @@ func (cp *Poller) Poll(obj optim.Objectiver, ev optim.Evaler, m optim.Mesh, from
 	objstop := &objStopper{Objectiver: obj, Best: from.Val}
 	results, n, err := ev.Eval(objstop, cp.points...)
 	if err != nil && err != FoundBetterErr {
+		cp.nConsecFail++
 		return false, best, n, err
 	}
 
@@ -383,8 +386,10 @@ func (cp *Poller) Poll(obj optim.Objectiver, ev optim.Evaler, m optim.Mesh, from
 	}
 
 	if best.Val < from.Val {
+		cp.nConsecFail = 0
 		return true, best, n, nil
 	} else {
+		cp.nConsecFail++
 		return false, from, n, nil
 	}
 }
