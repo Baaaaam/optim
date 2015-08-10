@@ -348,9 +348,9 @@ var BenchSeed int64 = 7
 // Benchmark performs several optimization runs using sfn to generate
 // set up problems for each run.  It uses fn as the objective and performs
 // tests confirming that at least some successfrac of runs achieved better
-// than fn's tolerance for optimum in less than avgiter iterations. Results
+// than fn's tolerance for optimum in less than avgeval evaluations. Results
 // are logged to t.
-func Benchmark(t *testing.T, fn Func, sfn func() *optim.Solver, successfrac, avgiter float64) {
+func Benchmark(t *testing.T, fn Func, sfn func() *optim.Solver, successfrac, avgeval float64) {
 	optim.Rand = rand.New(rand.NewSource(BenchSeed))
 	nrun := 44
 	ndrop := 2
@@ -388,16 +388,16 @@ func Benchmark(t *testing.T, fn Func, sfn func() *optim.Solver, successfrac, avg
 	}
 
 	frac := float64(nsuccess) / float64(nkeep)
-	gotavg := float64(niter) / float64(nkeep)
+	gotavg := float64(neval) / float64(nkeep)
 
-	t.Logf("[%v] %v/%v runs, %v iters, %v evals, want < %.3f, averaged %.3f", fn.Name(), nsuccess, nkeep, gotavg, neval/nkeep, fn.Tol(), sum/float64(nkeep))
+	t.Logf("[%v] %v/%v runs, %v iters, %v evals, want < %.3f, averaged %.3f", fn.Name(), nsuccess, nkeep, niter/nkeep, neval/nkeep, fn.Tol(), sum/float64(nkeep))
 
 	if frac < successfrac {
 		t.Errorf("    FAIL: only %v/%v runs succeeded, want %v/%v", nsuccess, nkeep, math.Ceil(successfrac*float64(nkeep)), nkeep)
 	}
 
-	if gotavg > avgiter {
-		t.Errorf("    FAIL: too many iterations: want %v, averaged %.2f", avgiter, gotavg)
+	if gotavg > avgeval {
+		t.Errorf("    FAIL: too many evaluations: want %v, averaged %.2f", avgeval, gotavg)
 	}
 }
 
