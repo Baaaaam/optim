@@ -82,14 +82,14 @@ func TestBenchPSwarmGriewank(t *testing.T) {
 	bench.Benchmark(t, fn, sfn, successfrac, avgeval)
 }
 
-func TestBenchPSwarmRastrigrin(t *testing.T) {
+func TestBenchPSwarmRastrigin(t *testing.T) {
 	ndim := 12
 	npar := 30
 	maxeval := 300000
 	avgeval := 30000.0
 	successfrac := 0.80
 
-	fn := bench.Rastrigrin{ndim}
+	fn := bench.Rastrigin{ndim}
 	sfn := func() *optim.Solver {
 		m, mesh := pswarmsolver(fn, nil, npar)
 		return &optim.Solver{

@@ -32,8 +32,8 @@ var Basic = []Func{
 	Rosenbrock{NDim: 10},
 	Griewank{NDim: 2},
 	//Griewank{NDim: 10},
-	Rastrigrin{NDim: 2},
-	Rastrigrin{NDim: 10},
+	Rastrigin{NDim: 2},
+	Rastrigin{NDim: 10},
 }
 
 type Func interface {
@@ -224,15 +224,15 @@ func (fn Styblinski) Optima() []*optim.Point {
 	}
 }
 
-type Rastrigrin struct {
+type Rastrigin struct {
 	NDim int
 }
 
-func (fn Rastrigrin) Name() string { return fmt.Sprintf("Rastrigrin_%vD", fn.NDim) }
+func (fn Rastrigin) Name() string { return fmt.Sprintf("Rastrigrin_%vD", fn.NDim) }
 
-func (fn Rastrigrin) Tol() float64 { return 5.0 / 3.0 * float64(fn.NDim) }
+func (fn Rastrigin) Tol() float64 { return 5.0 / 3.0 * float64(fn.NDim) }
 
-func (fn Rastrigrin) Eval(x []float64) float64 {
+func (fn Rastrigin) Eval(x []float64) float64 {
 	if !InsideBounds(x, fn) {
 		return math.Inf(1)
 	}
@@ -244,7 +244,7 @@ func (fn Rastrigrin) Eval(x []float64) float64 {
 	return tot
 }
 
-func (fn Rastrigrin) Bounds() (low, up []float64) {
+func (fn Rastrigin) Bounds() (low, up []float64) {
 	low = make([]float64, fn.NDim)
 	up = make([]float64, fn.NDim)
 	for i := range low {
@@ -254,7 +254,7 @@ func (fn Rastrigrin) Bounds() (low, up []float64) {
 	return low, up
 }
 
-func (fn Rastrigrin) Optima() []*optim.Point {
+func (fn Rastrigin) Optima() []*optim.Point {
 	return []*optim.Point{
 		&optim.Point{make([]float64, fn.NDim), 0},
 	}
