@@ -29,14 +29,50 @@ func TestBenchSwarmRosen(t *testing.T) {
 	npar := 30
 	maxeval := 30000
 	avgeval := 14000.0
-	successfrac := 1.00
+	successfrac := 0.95
 
 	fn := bench.Rosenbrock{ndim}
 	sfn := func() *optim.Solver {
 		return &optim.Solver{
 			Method:  swarmsolver(fn, nil, npar),
 			Obj:     optim.Func(fn.Eval),
-			MaxEval: maxeval * npar,
+			MaxEval: maxeval,
+		}
+	}
+	bench.Benchmark(t, fn, sfn, successfrac, avgeval)
+}
+
+func TestBenchSwarmGriewank(t *testing.T) {
+	ndim := 30
+	npar := 30
+	maxeval := 120000
+	avgeval := 80000.0
+	successfrac := 0.80
+
+	fn := bench.Griewank{ndim}
+	sfn := func() *optim.Solver {
+		return &optim.Solver{
+			Method:  swarmsolver(fn, nil, npar),
+			Obj:     optim.Func(fn.Eval),
+			MaxEval: maxeval,
+		}
+	}
+	bench.Benchmark(t, fn, sfn, successfrac, avgeval)
+}
+
+func TestBenchSwarmRastrigin(t *testing.T) {
+	ndim := 20
+	npar := 30
+	maxeval := 30000
+	avgeval := 18000.0
+	successfrac := 0.50
+
+	fn := bench.Rastrigin{ndim}
+	sfn := func() *optim.Solver {
+		return &optim.Solver{
+			Method:  swarmsolver(fn, nil, npar),
+			Obj:     optim.Func(fn.Eval),
+			MaxEval: maxeval,
 		}
 	}
 	bench.Benchmark(t, fn, sfn, successfrac, avgeval)
@@ -83,11 +119,11 @@ func TestBenchPSwarmGriewank(t *testing.T) {
 }
 
 func TestBenchPSwarmRastrigin(t *testing.T) {
-	ndim := 12
+	ndim := 20
 	npar := 30
-	maxeval := 300000
-	avgeval := 30000.0
-	successfrac := 0.80
+	maxeval := 40000
+	avgeval := 32000.0
+	successfrac := 0.25
 
 	fn := bench.Rastrigin{ndim}
 	sfn := func() *optim.Solver {
