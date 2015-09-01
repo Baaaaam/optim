@@ -323,9 +323,6 @@ func (m *Method) Iterate(obj optim.Objectiver, mesh optim.Mesh) (best *optim.Poi
 
 	// evaluate current positions
 	results, n, err := m.Evaler.Eval(obj, points...)
-	if err != nil {
-		return &optim.Point{Val: math.Inf(1)}, n, err
-	}
 	for _, p := range results {
 		pmap[p].Update(p)
 	}
@@ -351,7 +348,7 @@ func (m *Method) Iterate(obj optim.Objectiver, mesh optim.Mesh) (best *optim.Poi
 		}
 	}
 
-	return m.best, n, nil
+	return m.best, n, err
 }
 
 func (m *Method) AddPoint(p *optim.Point) {
