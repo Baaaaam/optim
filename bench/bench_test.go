@@ -6,11 +6,11 @@ import (
 	"math/rand"
 	"testing"
 
-	_ "github.com/rwcarlsen/go-sqlite/sqlite3"
-	"github.com/rwcarlsen/optim"
-	"github.com/rwcarlsen/optim/bench"
-	"github.com/rwcarlsen/optim/pattern"
-	"github.com/rwcarlsen/optim/swarm"
+	_ "github.com/baaaaam/go-sqlite/sqlite3"
+	"github.com/baaaaam/optim"
+	"github.com/baaaaam/optim/bench"
+	"github.com/baaaaam/optim/pattern"
+	"github.com/baaaaam/optim/swarm"
 )
 
 const (

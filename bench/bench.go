@@ -11,7 +11,7 @@ import (
 	"sort"
 	"testing"
 
-	"github.com/rwcarlsen/optim"
+	"github.com/baaaaam/optim"
 )
 
 var (

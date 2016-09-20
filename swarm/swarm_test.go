@@ -5,9 +5,9 @@ import (
 	"math"
 	"testing"
 
-	_ "github.com/rwcarlsen/go-sqlite/sqlite3"
-	"github.com/rwcarlsen/optim"
-	"github.com/rwcarlsen/optim/bench"
+	_ "github.com/baaaaam/go-sqlite/sqlite3"
+	"github.com/baaaaam/optim"
+	"github.com/baaaaam/optim/bench"
 )
 
 type fakeRand struct {

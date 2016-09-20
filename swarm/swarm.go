@@ -20,7 +20,7 @@ import (
 	"log"
 	"math"
 
-	"github.com/rwcarlsen/optim"
+	"github.com/baaaaam/optim"
 )
 
 // These parameters are calculated using a constriction factor originally
@@ -139,7 +139,7 @@ type Population []*Particle
 
 // NewPopulation initializes a population of particles using the given points
 // and generates velocities for each dimension i initialized to uniform random
-// values between minv[i] and maxv[i].  github.com/rwcarlsen/optim.Rand is
+// values between minv[i] and maxv[i].  github.com/baaaaam/optim.Rand is
 // used for random numbers.
 func NewPopulation(points []*optim.Point, vmax []float64) Population {
 	pop := make(Population, len(points))

@@ -8,7 +8,7 @@ import (
 	"math"
 	"sort"
 
-	"github.com/rwcarlsen/optim"
+	"github.com/baaaaam/optim"
 )
 
 var FoundBetterErr = errors.New("better position discovered")
